@@ -3,7 +3,8 @@ import type {
   CallScorecard,
   CallSuggestion,
   CallTranscriptEntry,
-  LiveConversationState
+  LiveConversationState,
+  ScreenContextItem
 } from "./types";
 
 async function postJson<TResponse>(
@@ -53,7 +54,7 @@ export async function requestCallSuggestion(input: {
   mode: "direct_coaching" | "call_copilot";
   latestUtterance: string;
   recentTranscript: CallTranscriptEntry[];
-  screenContext: Array<{ label: string; summary: string }>;
+  screenContext: ScreenContextItem[];
   salesContext: Record<string, unknown>;
   conversationState?: LiveConversationState | null;
   fetchImpl?: typeof fetch;
@@ -69,7 +70,7 @@ export async function requestCallSuggestion(input: {
   }, fetchImpl);
 }
 
-export async function requestScorecard(input: {
+export async function requestCallSummary(input: {
   workerBaseUrl: string;
   recentTranscript: CallTranscriptEntry[];
   fetchImpl?: typeof fetch;
@@ -77,12 +78,20 @@ export async function requestScorecard(input: {
   const fetchImpl = input.fetchImpl ?? fetch;
   return postJson<CallScorecard>(
     input.workerBaseUrl,
-    "/call/scorecard",
+    "/call/summary",
     {
       recentTranscript: input.recentTranscript
     },
     fetchImpl
   );
+}
+
+export async function requestScorecard(input: {
+  workerBaseUrl: string;
+  recentTranscript: CallTranscriptEntry[];
+  fetchImpl?: typeof fetch;
+}): Promise<CallScorecard> {
+  return requestCallSummary(input);
 }
 
 export async function requestLiveCallAnalysis(input: {
@@ -91,7 +100,7 @@ export async function requestLiveCallAnalysis(input: {
   file: Blob;
   mimeType?: string;
   recentTranscript: CallTranscriptEntry[];
-  screenContext: Array<{ label: string; summary: string }>;
+  screenContext: ScreenContextItem[];
   salesContext: Record<string, unknown>;
   conversationState?: LiveConversationState | null;
   fetchImpl?: typeof fetch;

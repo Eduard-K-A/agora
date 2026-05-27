@@ -82,7 +82,10 @@ export default {
       return json(await buildCallAudioAnalysis({ ...payload, file }, env));
     }
 
-    if (request.method === "POST" && url.pathname === "/call/scorecard") {
+    if (
+      request.method === "POST" &&
+      (url.pathname === "/call/summary" || url.pathname === "/call/scorecard")
+    ) {
       const payload = (await request.json()) as CallScorecardRequest;
       return json(await buildCallScorecard(payload, env));
     }

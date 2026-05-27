@@ -1,6 +1,7 @@
 PRAGMA foreign_keys = ON;
 
 DROP VIEW IF EXISTS low_stock_items;
+DROP TABLE IF EXISTS call_summaries;
 DROP TABLE IF EXISTS stock_movements;
 DROP TABLE IF EXISTS purchase_orders;
 DROP TABLE IF EXISTS inventory_stock;
@@ -81,6 +82,19 @@ CREATE TABLE stock_movements (
   created_at TEXT NOT NULL
 );
 
+CREATE TABLE call_summaries (
+  id INTEGER PRIMARY KEY,
+  business_id INTEGER NOT NULL REFERENCES businesses(id),
+  summary TEXT NOT NULL,
+  recommended_follow_up TEXT NOT NULL,
+  rep_coaching TEXT NOT NULL,
+  objections_json TEXT NOT NULL,
+  buying_signals_json TEXT NOT NULL,
+  scripts_used_json TEXT NOT NULL,
+  transcript_json TEXT NOT NULL,
+  created_at TEXT NOT NULL
+);
+
 CREATE VIEW low_stock_items AS
 SELECT
   p.sku,
@@ -101,7 +115,7 @@ JOIN locations l ON l.id = s.location_id
 WHERE p.is_active = 1;
 
 INSERT INTO businesses (id, name, industry, currency_code, created_at) VALUES
-  (1, 'Clicky Retail Supply', 'Retail POS equipment and consumables', 'USD', '2026-05-27T00:00:00Z');
+  (1, 'Ely Retail Supply', 'Retail POS equipment and consumables', 'USD', '2026-05-27T00:00:00Z');
 
 INSERT INTO suppliers (id, business_id, name, lead_time_days, contact_email) VALUES
   (1, 1, 'Northstar Hardware Distribution', 7, 'orders@northstar.example'),

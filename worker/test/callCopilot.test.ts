@@ -68,8 +68,8 @@ describe("callCopilot", () => {
       recentTranscript: [],
       screenContext: [],
       salesContext: {
-        companyName: "Clicky Sales Agent",
-        productName: "Clicky Sales Agent",
+        companyName: "Ely Sales Agent",
+        productName: "Ely Sales Agent",
         industry: "B2B software",
         prospectName: "Prospect",
         dealStage: "discovery",
@@ -175,8 +175,8 @@ describe("callCopilot", () => {
       recentTranscript: [],
       screenContext: [],
       salesContext: {
-        companyName: "Clicky Sales Agent",
-        productName: "Clicky Sales Agent",
+        companyName: "Ely Sales Agent",
+        productName: "Ely Sales Agent",
         industry: "B2B software",
         prospectName: "Prospect",
         dealStage: "discovery",
@@ -270,8 +270,8 @@ describe("callCopilot", () => {
         recentTranscript: [],
         screenContext: [],
         salesContext: {
-          companyName: "Clicky Sales Agent",
-          productName: "Clicky Sales Agent",
+          companyName: "Ely Sales Agent",
+          productName: "Ely Sales Agent",
           industry: "B2B software",
           prospectName: "Prospect",
           dealStage: "discovery",

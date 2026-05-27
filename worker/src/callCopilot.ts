@@ -683,6 +683,7 @@ export async function buildCallSuggestion(
     "Give a persuasive tip that helps the rep ethically move the customer toward the next concrete step.",
     "Be concise, specific, calm, and persuasive without being pushy.",
     "Use the provided sales context and transcript. Do not invent facts.",
+    "If screen context includes inventory or stock data, warn the rep about low stock, availability, inbound orders, or quantity mismatch.",
     "If confidence is low, prefer a clarifying question over a strong claim.",
     "Return only JSON that matches the schema."
   ].join(" ");
@@ -731,7 +732,7 @@ export async function buildCallScorecard(
   const client = createGroqClient(env);
 
   const systemPrompt = [
-    "You are generating a concise post-call scorecard for a sales rep.",
+    "You are generating a concise post-call summary for a sales rep.",
     "Focus on objections, buying signals, next-step quality, and rep coaching.",
     "Return only JSON that matches the schema."
   ].join(" ");
@@ -763,7 +764,7 @@ export async function buildCallScorecard(
   const parsed = await parseJsonContent<CallScorecard>(response.choices[0]?.message?.content);
   return (
     parsed ?? {
-      summary: "No scorecard could be generated.",
+      summary: "No summary could be generated.",
       objections: [],
       buyingSignals: [],
       scriptsUsed: [],

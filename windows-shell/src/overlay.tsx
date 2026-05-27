@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
-import { requestCallSuggestion, requestScorecard, requestTranscription } from "./callCopilotClient";
+import { requestCallSuggestion, requestCallSummary, requestTranscription } from "./callCopilotClient";
 import {
   createTranscriptEntry,
   startLiveAudioCapture,
@@ -14,19 +14,26 @@ import type {
   CallScorecard,
   CallSuggestion,
   CallTranscriptEntry,
-  LiveConversationState
+  LiveConversationState,
+  SaveCallSummaryRequest,
+  SaveCallSummaryResponse,
+  ScreenContextItem
 } from "./types";
+
+type ElySalesBridge = {
+  getWorkerBaseUrl: () => string;
+  resizeOverlay?: (width: number, height: number) => Promise<void>;
+  getInventoryContext?: (text: string) => Promise<ScreenContextItem[]>;
+  saveCallSummary?: (payload: SaveCallSummaryRequest) => Promise<SaveCallSummaryResponse>;
+};
 
 declare global {
   interface Window {
-    clickySales?: {
-      getWorkerBaseUrl: () => string;
-      resizeOverlay?: (width: number, height: number) => Promise<void>;
-    };
+    elySales?: ElySalesBridge;
   }
 }
 
-type VoiceState = "idle" | "starting" | "listening" | "transcribing" | "suggesting" | "error";
+type VoiceState = "idle" | "starting" | "listening" | "transcribing" | "suggesting" | "summarizing" | "error";
 
 const initialCaptureStatus: LiveAudioCaptureStatus = {
   mic: "idle",
@@ -60,13 +67,16 @@ function speakerLabel(entry: CallTranscriptEntry): string {
 }
 
 function Overlay() {
-  const workerBaseUrl = window.clickySales?.getWorkerBaseUrl() ?? "";
+  const appBridge = window.elySales;
+  const workerBaseUrl = appBridge?.getWorkerBaseUrl() ?? "";
   const shellRef = useRef<HTMLDivElement | null>(null);
   const [voiceState, setVoiceState] = useState<VoiceState>("idle");
   const [isListening, setIsListening] = useState(false);
   const [captureStatus, setCaptureStatus] = useState<LiveAudioCaptureStatus>(initialCaptureStatus);
   const [latestSuggestion, setLatestSuggestion] = useState<CallSuggestion | null>(null);
-  const [scorecard, setScorecard] = useState<CallScorecard | null>(null);
+  const [callSummary, setCallSummary] = useState<CallScorecard | null>(null);
+  const [savedSummary, setSavedSummary] = useState<SaveCallSummaryResponse | null>(null);
+  const [isGeneratingSummary, setIsGeneratingSummary] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [warnings, setWarnings] = useState<string[]>([]);
   const [transcript, setTranscript] = useState<CallTranscriptEntry[]>([]);
@@ -90,8 +100,8 @@ function Overlay() {
 
   const salesContext = useMemo(
     () => ({
-      companyName: "Clicky Sales Agent",
-      productName: "Clicky Sales Agent",
+      companyName: "Ely Sales Agent",
+      productName: "Ely Sales Agent",
       industry: "B2B software",
       prospectName: "Prospect",
       dealStage: "discovery",
@@ -119,27 +129,46 @@ function Overlay() {
     setCaptureStatus(status);
   }
 
+  async function loadInventoryContext(text: string): Promise<ScreenContextItem[]> {
+    if (!appBridge?.getInventoryContext) {
+      return [];
+    }
+
+    try {
+      return await appBridge.getInventoryContext(text);
+    } catch (err) {
+      setWarnings((current) => [
+        ...current,
+        err instanceof Error ? `Inventory context unavailable: ${err.message}` : "Inventory context unavailable."
+      ]);
+      return [];
+    }
+  }
+
   async function generateCustomerFeedback(latestUtteranceText: string) {
     const requestId = customerSuggestionRequestIdRef.current + 1;
     customerSuggestionRequestIdRef.current = requestId;
 
     try {
       setVoiceState("suggesting");
+      const inventoryContext = await loadInventoryContext(latestUtteranceText);
+      const screenContext: ScreenContextItem[] = [
+        {
+          label: "Listening mode",
+          summary: "Customer-only call stream."
+        },
+        {
+          label: "Feedback cadence",
+          summary: "One coaching suggestion per completed customer message."
+        },
+        ...inventoryContext
+      ];
       const suggestion = await requestCallSuggestion({
         workerBaseUrl,
         mode: "call_copilot",
         latestUtterance: latestUtteranceText,
         recentTranscript: transcriptRef.current,
-        screenContext: [
-          {
-            label: "Listening mode",
-            summary: "Customer-only call stream."
-          },
-          {
-            label: "Feedback cadence",
-            summary: "One coaching suggestion per completed customer message."
-          }
-        ],
+        screenContext,
         salesContext,
         conversationState: conversationStateRef.current
       });
@@ -229,7 +258,8 @@ function Overlay() {
     setError(null);
     setWarnings([]);
     setLatestSuggestion(null);
-    setScorecard(null);
+    setCallSummary(null);
+    setSavedSummary(null);
     setLatestUtterance("");
     setAnalysisDebug(null);
     updateTranscript([]);
@@ -279,18 +309,32 @@ function Overlay() {
     setVoiceState("idle");
   }
 
-  async function handleGenerateScorecard() {
-    if (transcript.length === 0) return;
+  async function handleGenerateSummary() {
+    if (transcript.length === 0 || isListening || isGeneratingSummary) return;
 
     setError(null);
+    setIsGeneratingSummary(true);
+    setVoiceState("summarizing");
     try {
-      const result = await requestScorecard({
+      const result = await requestCallSummary({
         workerBaseUrl,
         recentTranscript: transcript
       });
-      setScorecard(result);
+      setCallSummary(result);
+
+      if (appBridge?.saveCallSummary) {
+        const saved = await appBridge.saveCallSummary({
+          summary: result,
+          transcript,
+          createdAtISO: new Date().toISOString()
+        });
+        setSavedSummary(saved);
+      }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Scorecard generation failed");
+      setError(err instanceof Error ? err.message : "Summary generation failed");
+    } finally {
+      setIsGeneratingSummary(false);
+      setVoiceState(isListeningRef.current ? "listening" : "idle");
     }
   }
 
@@ -303,14 +347,14 @@ function Overlay() {
 
   useEffect(() => {
     const resize = () => {
-      if (!shellRef.current || !window.clickySales?.resizeOverlay) {
+      if (!shellRef.current || !appBridge?.resizeOverlay) {
         return;
       }
 
       const rect = shellRef.current.getBoundingClientRect();
       const width = Math.ceil(Math.max(420, rect.width + 24));
       const height = Math.ceil(Math.max(560, shellRef.current.scrollHeight + 24));
-      void window.clickySales.resizeOverlay(width, height);
+      void appBridge.resizeOverlay(width, height);
     };
 
     resize();
@@ -326,7 +370,7 @@ function Overlay() {
     return () => {
       observer?.disconnect();
     };
-  }, [captureStatus, error, latestSuggestion, latestUtterance, scorecard, transcript, warnings, voiceState]);
+  }, [callSummary, captureStatus, error, latestSuggestion, latestUtterance, transcript, warnings, voiceState]);
 
   return (
     <div
@@ -346,7 +390,7 @@ function Overlay() {
     >
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
         <div>
-          <div style={{ fontSize: 18, fontWeight: 700 }}>Clicky Sales</div>
+          <div style={{ fontSize: 18, fontWeight: 700 }}>Ely Sales Agent</div>
           <div style={{ fontSize: 12, opacity: 0.72 }}>Customer-only live listening</div>
         </div>
         <div
@@ -354,16 +398,26 @@ function Overlay() {
             fontSize: 11,
             padding: "4px 8px",
             borderRadius: 999,
-            background: voiceState === "starting" || voiceState === "transcribing" || voiceState === "suggesting"
+            background:
+              voiceState === "starting" ||
+              voiceState === "transcribing" ||
+              voiceState === "suggesting" ||
+              voiceState === "summarizing"
               ? "rgba(248,113,113,0.16)"
               : "rgba(255,255,255,0.08)",
-            color: voiceState === "starting" || voiceState === "transcribing" || voiceState === "suggesting"
+            color:
+              voiceState === "starting" ||
+              voiceState === "transcribing" ||
+              voiceState === "suggesting" ||
+              voiceState === "summarizing"
               ? "#fca5a5"
               : "rgba(255,255,255,0.78)"
           }}
         >
           {voiceState === "starting" || voiceState === "transcribing" || voiceState === "suggesting"
             ? "Listening"
+            : voiceState === "summarizing"
+              ? "Summarizing"
             : voiceState}
         </div>
       </div>
@@ -411,8 +465,8 @@ function Overlay() {
           Stop
         </button>
         <button
-          onClick={handleGenerateScorecard}
-          disabled={transcript.length === 0}
+          onClick={handleGenerateSummary}
+          disabled={transcript.length === 0 || isListening || isGeneratingSummary}
           style={{
             padding: "9px 12px",
             borderRadius: 12,
@@ -420,10 +474,10 @@ function Overlay() {
             background: "rgba(255,255,255,0.06)",
             color: "white",
             cursor: "pointer",
-            opacity: transcript.length === 0 ? 0.55 : 1
+            opacity: transcript.length === 0 || isListening || isGeneratingSummary ? 0.55 : 1
           }}
         >
-          Scorecard
+          {isGeneratingSummary ? "Summarizing..." : "Summary"}
         </button>
       </div>
 
@@ -523,7 +577,7 @@ function Overlay() {
         </div>
       )}
 
-      {scorecard && (
+      {callSummary && (
         <div
           style={{
             padding: 12,
@@ -533,11 +587,16 @@ function Overlay() {
             marginBottom: 10
           }}
         >
-          <div style={{ fontSize: 12, opacity: 0.72, marginBottom: 4 }}>Scorecard</div>
-          <div style={{ lineHeight: 1.45 }}>{scorecard.summary}</div>
+          <div style={{ fontSize: 12, opacity: 0.72, marginBottom: 4 }}>Call summary</div>
+          <div style={{ lineHeight: 1.45 }}>{callSummary.summary}</div>
           <div style={{ marginTop: 8, fontSize: 12, opacity: 0.78, lineHeight: 1.45 }}>
-            {scorecard.recommendedFollowUp}
+            {callSummary.recommendedFollowUp}
           </div>
+          {savedSummary && (
+            <div style={{ marginTop: 8, fontSize: 11, opacity: 0.62 }}>
+              Saved to SQLite summary #{savedSummary.id}
+            </div>
+          )}
         </div>
       )}
 

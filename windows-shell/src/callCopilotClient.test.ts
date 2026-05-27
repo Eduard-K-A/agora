@@ -1,5 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
-import { requestCallSuggestion, requestLiveCallAnalysis, requestTranscription } from "./callCopilotClient";
+import {
+  requestCallSuggestion,
+  requestCallSummary,
+  requestLiveCallAnalysis,
+  requestTranscription
+} from "./callCopilotClient";
 
 describe("requestCallSuggestion", () => {
   it("posts the call suggestion contract to the Worker", async () => {
@@ -27,8 +32,8 @@ describe("requestCallSuggestion", () => {
       recentTranscript: [],
       screenContext: [],
       salesContext: {
-        companyName: "Clicky Sales Agent",
-        productName: "Clicky Sales Agent",
+        companyName: "Ely Sales Agent",
+        productName: "Ely Sales Agent",
         industry: "B2B software",
         prospectName: "Prospect",
         dealStage: "discovery",
@@ -90,8 +95,8 @@ describe("requestCallSuggestion", () => {
       recentTranscript: [],
       screenContext: [],
       salesContext: {
-        companyName: "Clicky Sales Agent",
-        productName: "Clicky Sales Agent",
+        companyName: "Ely Sales Agent",
+        productName: "Ely Sales Agent",
         industry: "B2B software",
         prospectName: "Prospect",
         dealStage: "discovery",
@@ -126,6 +131,34 @@ describe("requestCallSuggestion", () => {
     expect(transcription.text).toBe("hello there");
     expect(fetchMock).toHaveBeenCalledWith(
       "https://example.workers.dev/transcribe",
+      expect.objectContaining({ method: "POST" })
+    );
+  });
+
+  it("posts transcript text to the call summary endpoint", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        summary: "The customer asked about pricing and next steps.",
+        objections: ["price"],
+        buyingSignals: ["asked about next steps"],
+        scriptsUsed: [],
+        recommendedFollowUp: "Send pricing options and schedule a follow-up.",
+        repCoaching: "Confirm quantity before quoting."
+      })
+    });
+
+    const summary = await requestCallSummary({
+      workerBaseUrl: "https://example.workers.dev",
+      recentTranscript: [
+        { speaker: "customer", text: "How much for 20 scanners?", timestampISO: "2026-05-27T04:00:00.000Z" }
+      ],
+      fetchImpl: fetchMock as typeof fetch
+    });
+
+    expect(summary.summary).toContain("pricing");
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://example.workers.dev/call/summary",
       expect.objectContaining({ method: "POST" })
     );
   });

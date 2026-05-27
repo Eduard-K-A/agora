@@ -1,6 +1,8 @@
 import { app, BrowserWindow, Menu, Tray, ipcMain, session } from "electron";
 import fs from "node:fs";
 import path from "node:path";
+import { getInventoryContextForText, saveCallSummaryToSqlite } from "./sqliteBusinessData";
+import type { SaveCallSummaryRequest } from "./types";
 
 let overlayWindow: BrowserWindow | null = null;
 let tray: Tray | null = null;
@@ -43,10 +45,10 @@ function createTray() {
   }
 
   tray = new Tray(icon);
-  tray.setToolTip("Clicky Sales");
+  tray.setToolTip("Ely Sales Agent");
   tray.setContextMenu(
     Menu.buildFromTemplate([
-      { label: "Show Clicky Sales", click: restoreOverlayWindow },
+      { label: "Show Ely Sales Agent", click: restoreOverlayWindow },
       { type: "separator" },
       {
         label: "Quit",
@@ -106,6 +108,14 @@ ipcMain.handle("overlay:resize-content", (_event, width: number, height: number)
   const nextWidth = Math.max(360, Math.ceil(width));
   const nextHeight = Math.max(240, Math.ceil(height));
   overlayWindow.setContentSize(nextWidth, nextHeight);
+});
+
+ipcMain.handle("business:get-inventory-context", (_event, text: string) => {
+  return getInventoryContextForText(text);
+});
+
+ipcMain.handle("business:save-call-summary", (_event, payload: SaveCallSummaryRequest) => {
+  return saveCallSummaryToSqlite(payload);
 });
 
 app.whenReady().then(() => {

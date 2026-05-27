@@ -17,5 +17,7 @@ export type {
   LiveConversationState,
   RealtimeSessionTokenResponse,
   SalesContext,
+  SaveCallSummaryRequest,
+  SaveCallSummaryResponse,
   ScreenContextItem
 } from "../../shared/contracts";

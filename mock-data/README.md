@@ -7,9 +7,12 @@ It is not called by the Worker or Electron shell yet.
 - `business-stock.sqlite` is generated from the seed file.
 
 The mock data represents a retail/POS equipment business with products, locations,
-stock levels, suppliers, purchase orders, and stock movement history.
+stock levels, suppliers, purchase orders, stock movement history, and saved
+call summaries.
 
 Example future use case:
 
 If a customer asks to buy 20 units of an item with only 10 available, the AI can use
 this database as context and warn the sales representative that stock is low.
+
+Generated call summaries are saved in the `call_summaries` table.

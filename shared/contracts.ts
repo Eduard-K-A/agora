@@ -129,6 +129,18 @@ export type CallScorecard = {
   repCoaching: string;
 };
 
+export type SaveCallSummaryRequest = {
+  summary: CallScorecard;
+  transcript: CallTranscriptEntry[];
+  createdAtISO?: string;
+};
+
+export type SaveCallSummaryResponse = {
+  id: number;
+  createdAtISO: string;
+  databasePath: string;
+};
+
 export type RealtimeSessionTokenResponse = {
   ephemeralKey: string;
   sessionId: string;
