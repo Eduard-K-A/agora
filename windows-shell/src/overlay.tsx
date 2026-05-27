@@ -35,6 +35,7 @@ declare global {
 }
 
 type VoiceState = "idle" | "starting" | "listening" | "transcribing" | "suggesting" | "summarizing" | "error";
+type UIState = "DASHBOARD" | "BUBBLE_LISTENING" | "BUBBLE_EXPANDED";
 type AppRegionStyle = React.CSSProperties & {
   WebkitAppRegion?: "drag" | "no-drag";
 };
@@ -192,6 +193,12 @@ function Overlay() {
         ? "Summarizing"
         : voiceState;
   const statusIsActive = voiceState !== "idle" && voiceState !== "error";
+  const UI_STATE: UIState = !isListening
+    ? "DASHBOARD"
+    : latestSuggestion || callSummary || error || warnings.length > 0
+      ? "BUBBLE_EXPANDED"
+      : "BUBBLE_LISTENING";
+  const isSphereActive = captureStatus.mic === "active" || captureStatus.system === "active";
 
   function updateTranscript(entries: CallTranscriptEntry[]) {
     transcriptRef.current = entries;
@@ -452,26 +459,29 @@ function Overlay() {
   return (
     <div
       ref={shellRef}
-      className="overlay-shell"
+      className={`overlay-shell ${UI_STATE === "DASHBOARD" ? "is-dashboard" : "is-bubble"}`}
       style={{
-        width: 420,
-        maxWidth: 420,
+        width: UI_STATE === "DASHBOARD" ? 420 : UI_STATE === "BUBBLE_EXPANDED" ? 352 : 124,
+        maxWidth: UI_STATE === "DASHBOARD" ? 420 : UI_STATE === "BUBBLE_EXPANDED" ? 352 : 124,
         height: "auto",
         minHeight: "fit-content",
         margin: 12,
-        padding: 24,
-        paddingBottom: 28,
-        borderRadius: 20,
-        background: "rgba(255, 255, 255, 0.6)",
+        padding: UI_STATE === "DASHBOARD" ? 24 : 0,
+        paddingBottom: UI_STATE === "DASHBOARD" ? 28 : 0,
+        borderRadius: UI_STATE === "DASHBOARD" ? 20 : 999,
+        background: UI_STATE === "DASHBOARD" ? "rgba(255, 255, 255, 0.6)" : "transparent",
         color: "#1f2937",
-        border: "1px solid rgba(255,255,255,0.4)",
-        boxShadow: "0 10px 30px rgba(0,0,0,0.08)",
-        backdropFilter: "blur(20px)",
-        WebkitBackdropFilter: "blur(20px)",
+        border: UI_STATE === "DASHBOARD" ? "1px solid rgba(255,255,255,0.4)" : "1px solid transparent",
+        boxShadow: UI_STATE === "DASHBOARD" ? "0 10px 30px rgba(0,0,0,0.08)" : "none",
+        backdropFilter: UI_STATE === "DASHBOARD" ? "blur(20px)" : "none",
+        WebkitBackdropFilter: UI_STATE === "DASHBOARD" ? "blur(20px)" : "none",
         fontFamily: "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
-        overflowWrap: "break-word"
+        overflowWrap: "break-word",
+        transition: "all 0.4s cubic-bezier(0.25, 1, 0.5, 1)"
       }}
     >
+      {UI_STATE === "DASHBOARD" ? (
+        <div className="dashboard-view">
       <div style={{
         display: "grid",
         gridTemplateColumns: "34px minmax(0, 1fr) auto",
@@ -671,8 +681,9 @@ function Overlay() {
           style={{
             padding: 12,
             borderRadius: 14,
-            background: "rgba(255,255,255,0.06)",
-            border: "1px solid rgba(255,255,255,0.08)",
+            background: "rgba(255,255,255,0.48)",
+            border: "1px solid rgba(255,255,255,0.62)",
+            boxShadow: "0 5px 16px rgba(15,23,42,0.04)",
             marginBottom: 10
           }}
         >
@@ -714,8 +725,8 @@ function Overlay() {
             marginBottom: 10,
             padding: 10,
             borderRadius: 12,
-            background: "rgba(255,255,255,0.04)",
-            border: "1px solid rgba(255,255,255,0.06)",
+            background: "rgba(248,250,252,0.48)",
+            border: "1px solid rgba(255,255,255,0.58)",
             fontSize: 12,
             lineHeight: 1.45
           }}
@@ -749,8 +760,9 @@ function Overlay() {
           style={{
             padding: 12,
             borderRadius: 14,
-            background: "rgba(255,255,255,0.05)",
-            border: "1px solid rgba(255,255,255,0.08)",
+            background: "rgba(255,255,255,0.48)",
+            border: "1px solid rgba(255,255,255,0.62)",
+            boxShadow: "0 5px 16px rgba(15,23,42,0.04)",
             marginBottom: 10
           }}
         >
@@ -768,7 +780,7 @@ function Overlay() {
       )}
 
       {warnings.length > 0 && (
-        <div style={{ marginTop: 8, fontSize: 12, color: "#ffd166" }}>
+        <div style={{ marginTop: 8, padding: "8px 10px", borderRadius: 10, background: "rgba(254,243,199,0.54)", fontSize: 12, color: "#92400e" }}>
           {warnings.slice(-2).map((warning, index) => (
             <div key={`${warning}-${index}`}>{warning}</div>
           ))}
@@ -776,7 +788,7 @@ function Overlay() {
       )}
 
       {error && (
-        <div style={{ marginTop: 8, fontSize: 12, color: "#ff7b72" }}>
+        <div style={{ marginTop: 8, padding: "8px 10px", borderRadius: 10, background: "rgba(254,226,226,0.68)", fontSize: 12, color: "#b91c1c" }}>
           {error}
         </div>
       )}
@@ -784,6 +796,91 @@ function Overlay() {
       <div style={{ marginTop: 8, fontSize: 11, opacity: 0.68, lineHeight: 1.45 }}>
         Live call listens to the rep microphone and customer system audio, keeps both transcript turns, and preserves the last recognized customer need across turns.
       </div>
+        </div>
+      ) : (
+        <div className={`bubble-stage ${UI_STATE === "BUBBLE_EXPANDED" ? "is-expanded" : ""}`}>
+          <div
+            className={`floating-sphere ${isSphereActive ? "is-active" : "is-idle"}`}
+            style={dragRegionStyle}
+          >
+            <div className="sphere-aura" />
+            <div className="sphere-core">
+              <span className="sphere-status-dot" />
+              <span className="sphere-label">Ely</span>
+              <span className="sphere-state">{statusLabel}</span>
+            </div>
+            <button
+              type="button"
+              className="ui-button sphere-stop"
+              style={noDragRegionStyle}
+              onClick={handleStopListening}
+              aria-label="Stop listening"
+              title="Stop listening"
+            >
+              Stop
+            </button>
+          </div>
+
+          {UI_STATE === "BUBBLE_EXPANDED" && (
+            <div className="bubble-response-panel" style={noDragRegionStyle}>
+              <div className="response-header">
+                <div>
+                  <div className="response-eyebrow">Live insight</div>
+                  <div className="response-title">Customer guidance</div>
+                </div>
+                <button
+                  type="button"
+                  className="ui-button response-stop"
+                  onClick={handleStopListening}
+                  aria-label="Stop listening"
+                >
+                  Stop
+                </button>
+              </div>
+
+              {latestSuggestion && (
+                <div className="response-stack">
+                  <div className="response-meta">
+                    <span className="response-chip">{customerTypeLabels[latestSuggestion.customerType]}</span>
+                    <span className="response-confidence">
+                      {Math.round(latestSuggestion.customerTypeConfidence * 100)}% confidence
+                    </span>
+                  </div>
+                  <div className="response-block">
+                    <span>Intent</span>
+                    <p>{latestSuggestion.customerIntent}</p>
+                  </div>
+                  <div className="response-block">
+                    <span>Talking point</span>
+                    <p>{latestSuggestion.recommendedInfo}</p>
+                  </div>
+                  <div className="response-block is-highlight">
+                    <span>Say this</span>
+                    <p>{latestSuggestion.sayThis}</p>
+                  </div>
+                  <div className="response-block">
+                    <span>Next action</span>
+                    <p>{latestSuggestion.nextAction}</p>
+                  </div>
+                </div>
+              )}
+
+              {callSummary && (
+                <div className="response-block is-summary">
+                  <span>Scorecard summary</span>
+                  <p>{callSummary.summary}</p>
+                  <p>{callSummary.recommendedFollowUp}</p>
+                </div>
+              )}
+
+              {warnings.length > 0 && (
+                <div className="response-alert is-warning">{warnings.slice(-2).join(" ")}</div>
+              )}
+              {error && <div className="response-alert is-error">{error}</div>}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
