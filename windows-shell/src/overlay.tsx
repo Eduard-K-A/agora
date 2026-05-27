@@ -22,6 +22,7 @@ import type {
 
 type ElySalesBridge = {
   getWorkerBaseUrl: () => string;
+  hideOverlay?: () => Promise<void>;
   resizeOverlay?: (width: number, height: number) => Promise<void>;
   getInventoryContext?: (text: string) => Promise<ScreenContextItem[]>;
   saveCallSummary?: (payload: SaveCallSummaryRequest) => Promise<SaveCallSummaryResponse>;
@@ -34,6 +35,17 @@ declare global {
 }
 
 type VoiceState = "idle" | "starting" | "listening" | "transcribing" | "suggesting" | "summarizing" | "error";
+type AppRegionStyle = React.CSSProperties & {
+  WebkitAppRegion?: "drag" | "no-drag";
+};
+
+const dragRegionStyle: AppRegionStyle = {
+  WebkitAppRegion: "drag"
+};
+
+const noDragRegionStyle: AppRegionStyle = {
+  WebkitAppRegion: "no-drag"
+};
 
 const initialCaptureStatus: LiveAudioCaptureStatus = {
   mic: "idle",
@@ -54,10 +66,10 @@ const customerTypeLabels: Record<CallCustomerType, string> = {
 };
 
 function statusColor(status: LiveAudioSourceStatus): string {
-  if (status === "active") return "#5ee28a";
-  if (status === "starting") return "#ffd166";
-  if (status === "blocked" || status === "error") return "#ff7b72";
-  return "rgba(255,255,255,0.55)";
+  if (status === "active") return "#16a34a";
+  if (status === "starting") return "#b45309";
+  if (status === "blocked" || status === "error") return "#dc2626";
+  return "#6b7280";
 }
 
 function speakerLabel(entry: CallTranscriptEntry): string {
@@ -119,6 +131,13 @@ function Overlay() {
     !!navigator.mediaDevices?.getUserMedia &&
     !!navigator.mediaDevices?.getDisplayMedia;
   const transcriptPreview = useMemo(() => transcript.slice(-5), [transcript]);
+  const statusLabel =
+    voiceState === "starting" || voiceState === "transcribing" || voiceState === "suggesting"
+      ? "Listening"
+      : voiceState === "summarizing"
+        ? "Summarizing"
+        : voiceState;
+  const statusIsActive = voiceState !== "idle" && voiceState !== "error";
 
   function updateTranscript(entries: CallTranscriptEntry[]) {
     transcriptRef.current = entries;
@@ -127,6 +146,10 @@ function Overlay() {
 
   function updateCaptureStatus(status: LiveAudioCaptureStatus) {
     setCaptureStatus(status);
+  }
+
+  function handleHideWindow() {
+    void appBridge?.hideOverlay?.();
   }
 
   async function loadInventoryContext(text: string): Promise<ScreenContextItem[]> {
@@ -391,41 +414,109 @@ function Overlay() {
         boxShadow: "0 10px 30px rgba(0,0,0,0.08)",
         backdropFilter: "blur(20px)",
         WebkitBackdropFilter: "blur(20px)",
-        fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+        fontFamily: "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
         overflowWrap: "break-word"
       }}
     >
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
-        <div>
-          <div style={{ fontSize: 18, fontWeight: 700 }}>Ely Sales Agent</div>
-          <div style={{ fontSize: 12, opacity: 0.72 }}>Customer-only live listening</div>
-        </div>
-        <div
+      <div style={{
+        display: "grid",
+        gridTemplateColumns: "34px minmax(0, 1fr) auto",
+        alignItems: "center",
+        gap: 12,
+        marginBottom: 18,
+        ...dragRegionStyle
+      }}>
+        <button
+          type="button"
+          className="ui-button"
           style={{
-            fontSize: 11,
-            padding: "4px 8px",
+            width: 32,
+            height: 32,
+            padding: 0,
+            border: "1px solid rgba(255,255,255,0.68)",
             borderRadius: 999,
-            background:
-              voiceState === "starting" ||
-              voiceState === "transcribing" ||
-              voiceState === "suggesting" ||
-              voiceState === "summarizing"
-              ? "rgba(248,113,113,0.16)"
-              : "rgba(255,255,255,0.08)",
-            color:
-              voiceState === "starting" ||
-              voiceState === "transcribing" ||
-              voiceState === "suggesting" ||
-              voiceState === "summarizing"
-              ? "#fca5a5"
-              : "rgba(255,255,255,0.78)"
+            background: "rgba(255,255,255,0.46)",
+            color: "#6b7280",
+            boxShadow: "0 3px 12px rgba(15,23,42,0.06)",
+            cursor: "pointer",
+            fontSize: 19,
+            lineHeight: 1,
+            ...noDragRegionStyle
           }}
+          aria-label="Menu"
+          title="Menu"
         >
-          {voiceState === "starting" || voiceState === "transcribing" || voiceState === "suggesting"
-            ? "Listening"
-            : voiceState === "summarizing"
-              ? "Summarizing"
-            : voiceState}
+          {"\u2261"}
+        </button>
+        <div style={{ minWidth: 0, overflowWrap: "break-word" }}>
+          <div style={{ fontSize: 18, lineHeight: 1.25, fontWeight: 700, color: "#334155" }}>
+            Ely Sales Agent
+          </div>
+          <div style={{ marginTop: 2, fontSize: 12, lineHeight: 1.35, color: "#94a3b8" }}>
+            Customer-only live listening
+          </div>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 6, ...noDragRegionStyle }}>
+          <div
+            style={{
+              marginRight: 2,
+              padding: "5px 9px",
+              borderRadius: 999,
+              background: statusIsActive ? "rgba(219,234,254,0.7)" : voiceState === "error" ? "rgba(254,226,226,0.84)" : "rgba(229,231,235,0.7)",
+              color: statusIsActive ? "#2563eb" : voiceState === "error" ? "#dc2626" : "#4b5563",
+              fontSize: 11,
+              lineHeight: 1,
+              fontWeight: 600,
+              textTransform: "capitalize",
+              whiteSpace: "nowrap"
+            }}
+          >
+            {statusLabel}
+          </div>
+          <button
+            type="button"
+            className="ui-button"
+            onClick={handleHideWindow}
+            style={{
+              width: 28,
+              height: 28,
+              padding: 0,
+              border: "1px solid rgba(255,255,255,0.68)",
+              borderRadius: 999,
+              background: "rgba(255,255,255,0.48)",
+              color: "#64748b",
+              boxShadow: "0 3px 12px rgba(15,23,42,0.06)",
+              cursor: "pointer",
+              lineHeight: 1,
+              ...noDragRegionStyle
+            }}
+            aria-label="Minimize to tray"
+            title="Minimize to tray"
+          >
+            -
+          </button>
+          <button
+            type="button"
+            className="ui-button window-close-button"
+            onClick={handleHideWindow}
+            style={{
+              width: 28,
+              height: 28,
+              padding: 0,
+              border: "1px solid rgba(255,255,255,0.68)",
+              borderRadius: 999,
+              background: "rgba(255,255,255,0.48)",
+              color: "#64748b",
+              boxShadow: "0 3px 12px rgba(15,23,42,0.06)",
+              cursor: "pointer",
+              lineHeight: 1,
+              ...noDragRegionStyle
+            }}
+            aria-label="Close to tray"
+            title="Close to tray"
+          >
+            x
+          </button>
         </div>
       </div>
 
