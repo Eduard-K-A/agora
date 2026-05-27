@@ -460,6 +460,7 @@ function Overlay() {
     <div
       ref={shellRef}
       className={`overlay-shell ${UI_STATE === "DASHBOARD" ? "is-dashboard" : "is-bubble"}`}
+      data-ui-state={UI_STATE}
       style={{
         width: UI_STATE === "DASHBOARD" ? 420 : UI_STATE === "BUBBLE_EXPANDED" ? 352 : 124,
         maxWidth: UI_STATE === "DASHBOARD" ? 420 : UI_STATE === "BUBBLE_EXPANDED" ? 352 : 124,
@@ -599,16 +600,17 @@ function Overlay() {
         <div
           style={{
             display: "grid",
-            gridTemplateColumns: "minmax(0, 1.35fr) minmax(0, 0.72fr) minmax(0, 0.9fr)",
+            gridTemplateColumns: "minmax(0, 1.45fr) minmax(0, 0.9fr)",
             gap: 8,
             marginBottom: 12
           }}
         >
           <button
             type="button"
-            className="ui-button primary-control"
-            onClick={handleStartListening}
-            disabled={isListening || voiceState === "starting" || voiceState === "transcribing" || voiceState === "suggesting"}
+            className={`ui-button primary-control listening-toggle${isListening ? " is-active" : ""}`}
+            onClick={isListening ? handleStopListening : handleStartListening}
+            disabled={voiceState === "starting" || voiceState === "transcribing" || voiceState === "suggesting"}
+            aria-pressed={isListening}
             style={{
               minHeight: 40,
               padding: "9px 12px",
@@ -620,33 +622,13 @@ function Overlay() {
               fontWeight: 650,
               cursor: "pointer",
               opacity:
-                isListening || voiceState === "starting" || voiceState === "transcribing" || voiceState === "suggesting"
+                voiceState === "starting" || voiceState === "transcribing" || voiceState === "suggesting"
                   ? 0.66
                   : 1,
               ...noDragRegionStyle
             }}
           >
-            {voiceState === "starting" ? "Starting..." : isListening ? "Listening..." : "Start Listening"}
-          </button>
-          <button
-            type="button"
-            className="ui-button secondary-control"
-            onClick={handleStopListening}
-            disabled={!isListening}
-            style={{
-              minHeight: 40,
-              padding: "9px 12px",
-              borderRadius: 12,
-              border: "1px solid rgba(255,255,255,0.62)",
-              background: "rgba(241,245,249,0.54)",
-              color: "#475569",
-              boxShadow: "inset 0 1px 0 rgba(255,255,255,0.72)",
-              cursor: "pointer",
-              opacity: !isListening ? 0.48 : 1,
-              ...noDragRegionStyle
-            }}
-          >
-            Stop
+            {voiceState === "starting" ? "Starting..." : isListening ? "Stop Listening" : "Start Listening"}
           </button>
           <button
             type="button"
@@ -811,9 +793,10 @@ function Overlay() {
             </div>
             <button
               type="button"
-              className="ui-button sphere-stop"
+              className="ui-button sphere-stop listening-toggle is-active"
               style={noDragRegionStyle}
-              onClick={handleStopListening}
+              onClick={isListening ? handleStopListening : handleStartListening}
+              aria-pressed={isListening}
               aria-label="Stop listening"
               title="Stop listening"
             >
@@ -828,18 +811,10 @@ function Overlay() {
                   <div className="response-eyebrow">Live insight</div>
                   <div className="response-title">Customer guidance</div>
                 </div>
-                <button
-                  type="button"
-                  className="ui-button response-stop"
-                  onClick={handleStopListening}
-                  aria-label="Stop listening"
-                >
-                  Stop
-                </button>
               </div>
 
               {latestSuggestion && (
-                <div className="response-stack">
+                <div key={`${latestSuggestion.sayThis}-${latestSuggestion.nextAction}`} className="response-stack response-refresh">
                   <div className="response-meta">
                     <span className="response-chip">{customerTypeLabels[latestSuggestion.customerType]}</span>
                     <span className="response-confidence">
@@ -866,7 +841,7 @@ function Overlay() {
               )}
 
               {callSummary && (
-                <div className="response-block is-summary">
+                <div key={callSummary.summary} className="response-block is-summary response-refresh">
                   <span>Scorecard summary</span>
                   <p>{callSummary.summary}</p>
                   <p>{callSummary.recommendedFollowUp}</p>

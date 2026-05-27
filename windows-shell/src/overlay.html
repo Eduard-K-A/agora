@@ -56,6 +56,12 @@
         box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.94), 0 10px 22px rgba(59, 130, 246, 0.19) !important;
       }
 
+      .listening-toggle.is-active {
+        background: rgba(254, 242, 242, 0.84) !important;
+        border-color: rgba(252, 165, 165, 0.42) !important;
+        color: #b91c1c !important;
+      }
+
       .secondary-control:not(:disabled):hover {
         background: rgba(255, 255, 255, 0.76) !important;
         box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.84), 0 5px 13px rgba(15, 23, 42, 0.06) !important;
@@ -108,7 +114,7 @@
         align-items: center;
         justify-content: center;
         border-radius: 50%;
-        background: rgba(255, 255, 255, 0.45);
+        background: rgba(255, 255, 255, 0.75);
         border: 1px solid rgba(255, 255, 255, 0.6);
         backdrop-filter: blur(25px);
         -webkit-backdrop-filter: blur(25px);
@@ -185,8 +191,7 @@
         -webkit-app-region: no-drag;
       }
 
-      .sphere-stop:hover,
-      .response-stop:hover {
+      .sphere-stop:hover {
         background: rgba(254, 226, 226, 0.82);
         color: #dc2626;
         box-shadow: 0 0 12px rgba(239, 68, 68, 0.2);
@@ -198,7 +203,7 @@
         padding: 16px;
         border: 1px solid rgba(255, 255, 255, 0.62);
         border-radius: 20px;
-        background: rgba(255, 255, 255, 0.68);
+        background: rgba(255, 255, 255, 0.88);
         backdrop-filter: blur(24px);
         -webkit-backdrop-filter: blur(24px);
         box-shadow:
@@ -232,21 +237,14 @@
         font-weight: 700;
       }
 
-      .response-stop {
-        min-height: 30px;
-        padding: 0 12px;
-        border: 1px solid rgba(255, 255, 255, 0.72);
-        border-radius: 999px;
-        background: rgba(241, 245, 249, 0.72);
-        color: #64748b;
-        font-size: 12px;
-        font-weight: 600;
-      }
-
       .response-stack {
         display: flex;
         flex-direction: column;
         gap: 8px;
+      }
+
+      .response-refresh {
+        animation: responseCrossfade 0.3s ease-in-out;
       }
 
       .response-meta {
@@ -376,7 +374,7 @@
 
       @keyframes sphereLive {
         0%, 100% {
-          transform: scale(1.02);
+          transform: scale(1.008);
           box-shadow:
             0 19px 45px rgba(15, 23, 42, 0.13),
             0 7px 23px rgba(96, 165, 250, 0.18),
@@ -384,7 +382,7 @@
         }
 
         50% {
-          transform: scale(1.05);
+          transform: scale(1.02);
           box-shadow:
             0 24px 54px rgba(15, 23, 42, 0.14),
             0 10px 31px rgba(96, 165, 250, 0.28),
@@ -401,6 +399,18 @@
         to {
           opacity: 1;
           transform: translateY(0) scale(1);
+        }
+      }
+
+      @keyframes responseCrossfade {
+        from {
+          opacity: 0;
+          transform: translateY(4px);
+        }
+
+        to {
+          opacity: 1;
+          transform: translateY(0);
         }
       }
     </style>
