@@ -83,6 +83,9 @@ describe("callCopilot", () => {
 
     expect(suggestion.customerType).toBe("buyer");
     expect(suggestion.recommendedInfo.length).toBeGreaterThan(0);
+    expect(createCompletionMock.mock.calls[0]?.[0].messages[0].content).toContain("SQLite inventory data");
+    expect(createCompletionMock.mock.calls[0]?.[0].messages[0].content).toContain("price");
+    expect(createCompletionMock.mock.calls[0]?.[0].messages[0].content).toContain("stock");
     expect(createCompletionMock).toHaveBeenCalledWith(
       expect.objectContaining({
         response_format: expect.objectContaining({
