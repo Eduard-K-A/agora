@@ -98,11 +98,11 @@ function CaptureStatusBadge({ label, status }: { label: string; status: LiveAudi
           ? "rgba(254,226,226,0.72)"
           : isLoading
             ? "rgba(254,243,199,0.66)"
-            : "rgba(255,255,255,0.55)",
+            : "rgba(255,255,255,0.9)",
         border: isError
           ? "1px solid rgba(248,113,113,0.2)"
           : "1px solid rgba(255,255,255,0.62)",
-        color: "#64748b",
+        color: "#475569",
         fontSize: 12,
         lineHeight: 1.2,
         fontWeight: 500
@@ -470,12 +470,12 @@ function Overlay() {
         padding: UI_STATE === "DASHBOARD" ? 24 : 0,
         paddingBottom: UI_STATE === "DASHBOARD" ? 28 : 0,
         borderRadius: UI_STATE === "DASHBOARD" ? 20 : 999,
-        background: UI_STATE === "DASHBOARD" ? "rgba(255, 255, 255, 0.6)" : "transparent",
+        background: UI_STATE === "DASHBOARD" ? "rgba(255, 255, 255, 0.9)" : "transparent",
         color: "#1f2937",
         border: UI_STATE === "DASHBOARD" ? "1px solid rgba(255,255,255,0.4)" : "1px solid transparent",
         boxShadow: UI_STATE === "DASHBOARD" ? "0 10px 30px rgba(0,0,0,0.08)" : "none",
-        backdropFilter: UI_STATE === "DASHBOARD" ? "blur(20px)" : "none",
-        WebkitBackdropFilter: UI_STATE === "DASHBOARD" ? "blur(20px)" : "none",
+        backdropFilter: UI_STATE === "DASHBOARD" ? "blur(30px)" : "none",
+        WebkitBackdropFilter: UI_STATE === "DASHBOARD" ? "blur(30px)" : "none",
         fontFamily: "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
         overflowWrap: "break-word",
         transition: "all 0.4s cubic-bezier(0.25, 1, 0.5, 1)"
@@ -500,8 +500,8 @@ function Overlay() {
             padding: 0,
             border: "1px solid rgba(255,255,255,0.68)",
             borderRadius: 999,
-            background: "rgba(255,255,255,0.46)",
-            color: "#6b7280",
+            background: "rgba(255,255,255,0.88)",
+            color: "#475569",
             boxShadow: "0 3px 12px rgba(15,23,42,0.06)",
             cursor: "pointer",
             fontSize: 19,
@@ -517,7 +517,7 @@ function Overlay() {
           <div style={{ fontSize: 18, lineHeight: 1.25, fontWeight: 700, color: "#334155" }}>
             Ely Sales Agent
           </div>
-          <div style={{ marginTop: 2, fontSize: 12, lineHeight: 1.35, color: "#94a3b8" }}>
+          <div style={{ marginTop: 2, fontSize: 12, lineHeight: 1.35, color: "#64748b" }}>
             Customer-only live listening
           </div>
         </div>
@@ -527,8 +527,8 @@ function Overlay() {
               marginRight: 2,
               padding: "5px 9px",
               borderRadius: 999,
-              background: statusIsActive ? "rgba(219,234,254,0.7)" : voiceState === "error" ? "rgba(254,226,226,0.84)" : "rgba(229,231,235,0.7)",
-              color: statusIsActive ? "#2563eb" : voiceState === "error" ? "#dc2626" : "#4b5563",
+              background: statusIsActive ? "rgba(219,234,254,0.9)" : voiceState === "error" ? "rgba(254,226,226,0.92)" : "rgba(229,231,235,0.9)",
+              color: statusIsActive ? "#1d4ed8" : voiceState === "error" ? "#b91c1c" : "#334155",
               fontSize: 11,
               lineHeight: 1,
               fontWeight: 600,
@@ -549,8 +549,8 @@ function Overlay() {
               padding: 0,
               border: "1px solid rgba(255,255,255,0.68)",
               borderRadius: 999,
-              background: "rgba(255,255,255,0.48)",
-              color: "#64748b",
+              background: "rgba(255,255,255,0.88)",
+              color: "#475569",
               boxShadow: "0 3px 12px rgba(15,23,42,0.06)",
               cursor: "pointer",
               lineHeight: 1,
@@ -571,8 +571,8 @@ function Overlay() {
               padding: 0,
               border: "1px solid rgba(255,255,255,0.68)",
               borderRadius: 999,
-              background: "rgba(255,255,255,0.48)",
-              color: "#64748b",
+              background: "rgba(255,255,255,0.88)",
+              color: "#475569",
               boxShadow: "0 3px 12px rgba(15,23,42,0.06)",
               cursor: "pointer",
               lineHeight: 1,
@@ -591,7 +591,7 @@ function Overlay() {
           marginBottom: 14,
           padding: 12,
           borderRadius: 16,
-          background: "rgba(255,255,255,0.34)",
+          background: "rgba(255,255,255,0.92)",
           border: "1px solid rgba(255,255,255,0.5)",
           boxShadow: "inset 0 1px 2px rgba(255,255,255,0.72), 0 6px 18px rgba(15,23,42,0.04)",
           ...noDragRegionStyle
@@ -640,8 +640,8 @@ function Overlay() {
               padding: "9px 12px",
               borderRadius: 12,
               border: "1px solid rgba(255,255,255,0.62)",
-              background: "rgba(241,245,249,0.54)",
-              color: "#475569",
+              background: "rgba(241,245,249,0.9)",
+              color: "#334155",
               boxShadow: "inset 0 1px 0 rgba(255,255,255,0.72)",
               cursor: "pointer",
               opacity: transcript.length === 0 || isListening || isGeneratingSummary ? 0.48 : 1,
@@ -663,7 +663,7 @@ function Overlay() {
           style={{
             padding: 12,
             borderRadius: 14,
-            background: "rgba(255,255,255,0.48)",
+            background: "rgba(255,255,255,0.9)",
             border: "1px solid rgba(255,255,255,0.62)",
             boxShadow: "0 5px 16px rgba(15,23,42,0.04)",
             marginBottom: 10
@@ -707,7 +707,7 @@ function Overlay() {
             marginBottom: 10,
             padding: 10,
             borderRadius: 12,
-            background: "rgba(248,250,252,0.48)",
+            background: "rgba(248,250,252,0.9)",
             border: "1px solid rgba(255,255,255,0.58)",
             fontSize: 12,
             lineHeight: 1.45
@@ -742,7 +742,7 @@ function Overlay() {
           style={{
             padding: 12,
             borderRadius: 14,
-            background: "rgba(255,255,255,0.48)",
+            background: "rgba(255,255,255,0.9)",
             border: "1px solid rgba(255,255,255,0.62)",
             boxShadow: "0 5px 16px rgba(15,23,42,0.04)",
             marginBottom: 10
