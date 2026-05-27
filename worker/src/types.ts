@@ -1,0 +1,28 @@
+export type {
+  AgoraRTCTokenResponse,
+  AgoraRTMTokenResponse,
+  CallObjectionType,
+  CallScorecard,
+  CallScorecardRequest,
+  CallSessionStatus,
+  CallSpeaker,
+  CallSuggestion,
+  CallSuggestionRequest,
+  CallTranscriptEntry,
+  RealtimeSessionTokenResponse,
+  RealtimeVoiceMode,
+  SalesContext,
+  ScreenContextItem
+} from "../../shared/contracts";
+
+export type Env = {
+  AGORA_APP_ID?: string;
+  AGORA_APP_CERTIFICATE?: string;
+  AGORA_CUSTOMER_ID?: string;
+  AGORA_CUSTOMER_SECRET?: string;
+  GROQ_API_KEY?: string;
+};
+
+export type TranscriptionResponse = {
+  text: string;
+};
