@@ -1,6 +1,7 @@
 node_modules/
 dist/
 build/
+.out/
 .wrangler/
 .env
 .dev.vars
@@ -10,3 +11,4 @@ build/
 coverage/
 *.log
 .DS_Store
+windows-shell/out/
