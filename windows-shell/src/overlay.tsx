@@ -1,8 +1,8 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
-import { requestLiveCallAnalysis, requestScorecard } from "./callCopilotClient";
+import { requestCallSuggestion, requestScorecard, requestTranscription } from "./callCopilotClient";
 import {
-  LIVE_AUDIO_CHUNK_DURATION_MS,
+  createTranscriptEntry,
   startLiveAudioCapture,
   type LiveAudioCaptureSession,
   type LiveAudioCaptureStatus,
@@ -10,7 +10,6 @@ import {
   type LiveAudioSourceStatus
 } from "./liveAudioCapture";
 import type {
-  CallAudioAnalysisResponse,
   CallCustomerType,
   CallScorecard,
   CallSuggestion,
@@ -72,13 +71,22 @@ function Overlay() {
   const [warnings, setWarnings] = useState<string[]>([]);
   const [transcript, setTranscript] = useState<CallTranscriptEntry[]>([]);
   const [latestUtterance, setLatestUtterance] = useState("");
-  const [analysisDebug, setAnalysisDebug] = useState<CallAudioAnalysisResponse | null>(null);
+  const [analysisDebug, setAnalysisDebug] = useState<{
+    transcriptText: string;
+    source: "mic" | "system";
+    speaker: "agent" | "customer";
+    speakerConfidence: number;
+    reason: string;
+    ignored: boolean;
+    transcriptEntry?: CallTranscriptEntry;
+  } | null>(null);
 
   const captureSessionRef = useRef<LiveAudioCaptureSession | null>(null);
   const isListeningRef = useRef(false);
   const transcriptRef = useRef<CallTranscriptEntry[]>([]);
   const conversationStateRef = useRef<LiveConversationState | null>(null);
   const processingQueueRef = useRef<Promise<void>>(Promise.resolve());
+  const customerSuggestionRequestIdRef = useRef(0);
 
   const salesContext = useMemo(
     () => ({
@@ -111,16 +119,16 @@ function Overlay() {
     setCaptureStatus(status);
   }
 
-  async function processAudioChunk(chunk: LiveAudioChunk) {
-    try {
-      setError(null);
-      setVoiceState("transcribing");
+  async function generateCustomerFeedback(latestUtteranceText: string) {
+    const requestId = customerSuggestionRequestIdRef.current + 1;
+    customerSuggestionRequestIdRef.current = requestId;
 
-      const analysis = await requestLiveCallAnalysis({
+    try {
+      setVoiceState("suggesting");
+      const suggestion = await requestCallSuggestion({
         workerBaseUrl,
-        source: chunk.source === "mic" ? "mic" : "system",
-        file: chunk.blob,
-        mimeType: chunk.mimeType,
+        mode: "call_copilot",
+        latestUtterance: latestUtteranceText,
         recentTranscript: transcriptRef.current,
         screenContext: [
           {
@@ -128,38 +136,82 @@ function Overlay() {
             summary: "Customer-only call stream."
           },
           {
-            label: "Capture source",
-            summary: `Latest chunk came from ${chunk.source === "system" ? "customer audio stream" : "microphone"}`
+            label: "Feedback cadence",
+            summary: "One coaching suggestion per completed customer message."
           }
         ],
         salesContext,
-        conversationState: conversationStateRef.current ?? undefined
+        conversationState: conversationStateRef.current
       });
-      setAnalysisDebug(analysis);
 
-      if (analysis.ignored || !analysis.transcriptEntry) {
+      if (customerSuggestionRequestIdRef.current !== requestId || !isListeningRef.current) {
+        return;
+      }
+
+      conversationStateRef.current = {
+        summary: `${suggestion.customerType}: ${suggestion.customerIntent}`,
+        lastCustomerUtterance: latestUtteranceText,
+        lastCustomerIntent: suggestion.customerIntent,
+        lastCustomerNeedCategory: "unclear",
+        lastCustomerType: suggestion.customerType,
+        confidence: suggestion.customerTypeConfidence,
+        lastUpdatedISO: new Date().toISOString()
+      };
+      setLatestSuggestion(suggestion);
+    } catch (err) {
+      if (customerSuggestionRequestIdRef.current === requestId) {
+        setError(err instanceof Error ? err.message : "Customer feedback generation failed");
+      }
+    } finally {
+      if (customerSuggestionRequestIdRef.current === requestId) {
+        setVoiceState(isListeningRef.current ? "listening" : "idle");
+      }
+    }
+  }
+
+  async function processAudioChunk(chunk: LiveAudioChunk) {
+    try {
+      setError(null);
+      setVoiceState("transcribing");
+
+      const transcription = await requestTranscription({
+        workerBaseUrl,
+        file: chunk.blob,
+        mimeType: chunk.mimeType
+      });
+
+      const text = transcription.text.trim();
+      const speaker = chunk.source === "mic" ? "agent" : "customer";
+      const transcriptEntry = text
+        ? createTranscriptEntry(speaker, text)
+        : undefined;
+
+      setAnalysisDebug({
+        transcriptText: text,
+        source: chunk.source === "mic" ? "mic" : "system",
+        speaker,
+        speakerConfidence: text ? 1 : 0,
+        reason:
+          chunk.source === "mic"
+            ? "Device microphone mapped to representative speech."
+            : "System audio mapped to customer speech.",
+        ignored: !text,
+        transcriptEntry
+      });
+
+      if (!text || !transcriptEntry) {
         setVoiceState(isListeningRef.current ? "listening" : "idle");
         return;
       }
 
-      setLatestUtterance(analysis.transcriptEntry.text);
-      const updatedTranscript = [...transcriptRef.current, analysis.transcriptEntry].slice(-30);
+      setLatestUtterance(transcriptEntry.text);
+      const updatedTranscript = [...transcriptRef.current, transcriptEntry].slice(-30);
       updateTranscript(updatedTranscript);
 
-      if (analysis.speaker === "customer" && analysis.suggestion) {
-        conversationStateRef.current = {
-          summary: analysis.suggestion
-            ? `${analysis.suggestion.customerType}: ${analysis.suggestion.customerIntent}`
-            : analysis.transcriptEntry.text,
-          lastCustomerUtterance: analysis.transcriptEntry.text,
-          lastCustomerIntent: analysis.suggestion?.customerIntent ?? analysis.transcriptEntry.text,
-          lastCustomerNeedCategory: analysis.customerNeedCategory ?? "unclear",
-          lastCustomerType: analysis.suggestion?.customerType ?? "unknown",
-          confidence: analysis.suggestion?.customerTypeConfidence ?? analysis.speakerConfidence ?? 0.5,
-          lastUpdatedISO: analysis.transcriptEntry.timestampISO
-        };
-        setLatestSuggestion(analysis.suggestion);
+      if (speaker === "customer") {
+        await generateCustomerFeedback(transcriptEntry.text);
       }
+
       setVoiceState(isListeningRef.current ? "listening" : "idle");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Live call processing failed");
@@ -182,6 +234,7 @@ function Overlay() {
     setAnalysisDebug(null);
     updateTranscript([]);
     conversationStateRef.current = null;
+    customerSuggestionRequestIdRef.current = 0;
 
     if (!canListen) {
       setError("Customer audio capture is not available in this environment.");
@@ -195,7 +248,6 @@ function Overlay() {
       isListeningRef.current = true;
 
       const session = await startLiveAudioCapture({
-        chunkDurationMs: LIVE_AUDIO_CHUNK_DURATION_MS,
         audioFocus: "both",
         onChunk: enqueueAudioChunk,
         onStatusChange: updateCaptureStatus,
@@ -223,6 +275,7 @@ function Overlay() {
     setIsListening(false);
     captureSessionRef.current?.stop();
     captureSessionRef.current = null;
+    customerSuggestionRequestIdRef.current += 1;
     setVoiceState("idle");
   }
 
@@ -453,12 +506,6 @@ function Overlay() {
           <div style={{ marginBottom: 4 }}>
             <strong>Speaker:</strong> {analysisDebug.speaker} ({Math.round(analysisDebug.speakerConfidence * 100)}%)
           </div>
-          {analysisDebug.customerNeedCategory && (
-            <div style={{ marginBottom: 4 }}>
-              <strong>Need:</strong> {analysisDebug.customerNeedCategory}
-              {analysisDebug.customerNeedSummary ? ` - ${analysisDebug.customerNeedSummary}` : ""}
-            </div>
-          )}
           <div>
             <strong>Reason:</strong> {analysisDebug.reason}
           </div>

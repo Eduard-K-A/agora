@@ -65,9 +65,8 @@ export async function requestCallSuggestion(input: {
     recentTranscript: input.recentTranscript,
     screenContext: input.screenContext,
     salesContext: input.salesContext,
-    conversationState: input.conversationState ?? undefined,
-    fetchImpl
-  });
+    conversationState: input.conversationState ?? undefined
+  }, fetchImpl);
 }
 
 export async function requestScorecard(input: {
@@ -119,4 +118,26 @@ export async function requestLiveCallAnalysis(input: {
   }
 
   return response.json() as Promise<CallAudioAnalysisResponse>;
+}
+
+export async function requestTranscription(input: {
+  workerBaseUrl: string;
+  file: Blob;
+  mimeType?: string;
+  fetchImpl?: typeof fetch;
+}): Promise<{ text: string }> {
+  const fetchImpl = input.fetchImpl ?? fetch;
+  const formData = new FormData();
+  formData.append("file", resolveAudioFile({ file: input.file, mimeType: input.mimeType }));
+
+  const response = await fetchImpl(`${input.workerBaseUrl}/transcribe`, {
+    method: "POST",
+    body: formData
+  });
+
+  if (!response.ok) {
+    throw new Error(`Transcription failed with HTTP ${response.status}`);
+  }
+
+  return response.json() as Promise<{ text: string }>;
 }

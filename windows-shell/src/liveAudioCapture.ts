@@ -23,7 +23,7 @@ export type LiveAudioCaptureSession = {
 };
 
 export type StartLiveAudioCaptureOptions = {
-  chunkDurationMs?: number;
+  maxUtteranceDurationMs?: number;
   audioFocus?: "microphone" | "customer" | "both";
   onChunk: (chunk: LiveAudioChunk) => void | Promise<void>;
   onStatusChange?: (status: LiveAudioCaptureStatus) => void;
@@ -39,13 +39,20 @@ type CaptureHandle = {
   processor: ScriptProcessorNode;
   muteNode: GainNode;
   sampleRate: number;
-  samplesPerChunk: number;
+  silenceSamplesBeforeFlush: number;
+  maxSamplesPerUtterance: number;
+  minSamplesPerUtterance: number;
+  trailingSilenceSamples: number;
+  hasSpeech: boolean;
   bufferedSamples: number;
   buffers: Float32Array[];
 };
 
-export const LIVE_AUDIO_CHUNK_DURATION_MS = 2500;
 export const MIN_TRANSCRIBABLE_AUDIO_BYTES = 1024;
+export const LIVE_AUDIO_UTTERANCE_SILENCE_MS = 900;
+export const LIVE_AUDIO_MAX_UTTERANCE_MS = 12000;
+export const LIVE_AUDIO_MIN_UTTERANCE_MS = 300;
+export const LIVE_AUDIO_SPEECH_RMS_THRESHOLD = 0.012;
 
 export function speakerForAudioSource(source: LiveAudioSource): CallSpeaker {
   if (source === "mic") return "agent";
@@ -70,6 +77,27 @@ export function shouldTranscribeChunk(
   minBytes: number = MIN_TRANSCRIBABLE_AUDIO_BYTES
 ): boolean {
   return blob.size >= minBytes;
+}
+
+export function calculateRms(samples: Float32Array): number {
+  if (samples.length === 0) {
+    return 0;
+  }
+
+  let sum = 0;
+  for (let index = 0; index < samples.length; index += 1) {
+    const sample = samples[index] ?? 0;
+    sum += sample * sample;
+  }
+
+  return Math.sqrt(sum / samples.length);
+}
+
+export function isLikelySpeech(
+  samples: Float32Array,
+  threshold: number = LIVE_AUDIO_SPEECH_RMS_THRESHOLD
+): boolean {
+  return calculateRms(samples) >= threshold;
 }
 
 function createInitialStatus(): LiveAudioCaptureStatus {
@@ -203,7 +231,7 @@ export async function startLiveAudioCapture(
     throw new Error("AudioContext is not available in this environment.");
   }
 
-  const chunkDurationMs = options.chunkDurationMs ?? LIVE_AUDIO_CHUNK_DURATION_MS;
+  const maxUtteranceDurationMs = options.maxUtteranceDurationMs ?? LIVE_AUDIO_MAX_UTTERANCE_MS;
   const audioFocus = options.audioFocus ?? "both";
   const captureHandles: CaptureHandle[] = [];
   const status = createInitialStatus();
@@ -249,6 +277,8 @@ export async function startLiveAudioCapture(
     const combinedSamples = combineBuffers(handle.buffers, handle.bufferedSamples);
     handle.buffers = [];
     handle.bufferedSamples = 0;
+    handle.trailingSilenceSamples = 0;
+    handle.hasSpeech = false;
 
     const wavBuffer = encodeWav(combinedSamples, handle.sampleRate);
     emitChunk(handle.source, new Blob([wavBuffer], { type: "audio/wav" }));
@@ -259,10 +289,24 @@ export async function startLiveAudioCapture(
       return;
     }
 
+    if (isLikelySpeech(samples)) {
+      handle.hasSpeech = true;
+      handle.trailingSilenceSamples = 0;
+    } else if (handle.hasSpeech) {
+      handle.trailingSilenceSamples += samples.length;
+    } else {
+      return;
+    }
+
     handle.buffers.push(samples);
     handle.bufferedSamples += samples.length;
 
-    if (handle.bufferedSamples >= handle.samplesPerChunk) {
+    const reachedMaxDuration = handle.bufferedSamples >= handle.maxSamplesPerUtterance;
+    const reachedSilenceBoundary =
+      handle.trailingSilenceSamples >= handle.silenceSamplesBeforeFlush &&
+      handle.bufferedSamples >= handle.minSamplesPerUtterance;
+
+    if (reachedMaxDuration || reachedSilenceBoundary) {
       flushHandle(handle);
     }
   };
@@ -286,7 +330,11 @@ export async function startLiveAudioCapture(
       processor,
       muteNode,
       sampleRate: audioContext.sampleRate,
-      samplesPerChunk: Math.max(4096, Math.round(audioContext.sampleRate * (chunkDurationMs / 1000))),
+      silenceSamplesBeforeFlush: Math.round(audioContext.sampleRate * (LIVE_AUDIO_UTTERANCE_SILENCE_MS / 1000)),
+      maxSamplesPerUtterance: Math.round(audioContext.sampleRate * (maxUtteranceDurationMs / 1000)),
+      minSamplesPerUtterance: Math.round(audioContext.sampleRate * (LIVE_AUDIO_MIN_UTTERANCE_MS / 1000)),
+      trailingSilenceSamples: 0,
+      hasSpeech: false,
       bufferedSamples: 0,
       buffers: []
     };

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { requestCallSuggestion, requestLiveCallAnalysis } from "./callCopilotClient";
+import { requestCallSuggestion, requestLiveCallAnalysis, requestTranscription } from "./callCopilotClient";
 
 describe("requestCallSuggestion", () => {
   it("posts the call suggestion contract to the Worker", async () => {
@@ -107,6 +107,25 @@ describe("requestCallSuggestion", () => {
     expect(analysis.speaker).toBe("customer");
     expect(fetchMock).toHaveBeenCalledWith(
       "https://example.workers.dev/call/ingest",
+      expect.objectContaining({ method: "POST" })
+    );
+  });
+
+  it("posts audio to the transcription endpoint", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ text: "hello there" })
+    });
+
+    const transcription = await requestTranscription({
+      workerBaseUrl: "https://example.workers.dev",
+      file: new Blob(["x".repeat(2048)]),
+      fetchImpl: fetchMock as typeof fetch
+    });
+
+    expect(transcription.text).toBe("hello there");
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://example.workers.dev/transcribe",
       expect.objectContaining({ method: "POST" })
     );
   });
