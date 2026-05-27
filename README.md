@@ -1,6 +1,6 @@
 # Agora Copilot
 
-Desktop voice sales assistant prototype built from a Cloudflare Worker and a Windows Electron shell.
+Desktop voice sales assistant prototype built from a Cloudflare Worker and a cross-platform Electron shell.
 
 ## What It Does
 
@@ -58,7 +58,7 @@ Start the Worker:
 npm run dev -w worker
 ```
 
-Start the Electron shell in a second terminal:
+Start the Electron shell in a second terminal on Windows or macOS:
 
 ```bash
 npm run dev -w windows-shell
@@ -83,9 +83,18 @@ npm run dev -w windows-shell
   - currently affects the request mode only
   - real Agora call orchestration is still future work
 
+## macOS Notes
+
+- The Electron shell runs on macOS without code changes.
+- If you want packaged Mac builds later, you can add an Electron builder step for `darwin`.
+- The current dev command is the same on macOS:
+
+```bash
+npm run dev -w windows-shell
+```
+
 ## Notes
 
 - This is a prototype/demo build, not a production sales system.
 - The current voice flow is push-to-talk, not continuous streaming.
 - The app currently transcribes actual microphone input, not hardcoded text.
-

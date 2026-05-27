@@ -33,6 +33,12 @@ app.whenReady().then(() => {
   createOverlayWindow();
 });
 
+app.on("activate", () => {
+  if (BrowserWindow.getAllWindows().length === 0) {
+    createOverlayWindow();
+  }
+});
+
 app.on("window-all-closed", () => {
   if (process.platform !== "darwin") {
     app.quit();
