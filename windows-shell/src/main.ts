@@ -1,7 +1,32 @@
-import { app, BrowserWindow } from "electron";
+import { app, BrowserWindow, desktopCapturer, session } from "electron";
 import path from "node:path";
 
 let overlayWindow: BrowserWindow | null = null;
+
+function configureDisplayMediaHandler() {
+  session.defaultSession.setDisplayMediaRequestHandler((_, callback) => {
+    void desktopCapturer
+      .getSources({
+        types: ["screen"],
+        thumbnailSize: { width: 0, height: 0 }
+      })
+      .then((sources) => {
+        const screenSource = sources[0];
+        if (!screenSource) {
+          callback({});
+          return;
+        }
+
+        callback({
+          video: screenSource,
+          audio: "loopback"
+        });
+      })
+      .catch(() => {
+        callback({});
+      });
+  });
+}
 
 function createOverlayWindow() {
   const preloadPath = path.join(__dirname, "../preload/index.js");
@@ -9,7 +34,7 @@ function createOverlayWindow() {
 
   overlayWindow = new BrowserWindow({
     width: 360,
-    height: 240,
+    height: 560,
     frame: false,
     transparent: true,
     alwaysOnTop: true,
@@ -30,6 +55,7 @@ function createOverlayWindow() {
 }
 
 app.whenReady().then(() => {
+  configureDisplayMediaHandler();
   createOverlayWindow();
 });
 

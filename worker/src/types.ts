@@ -1,6 +1,7 @@
 export type {
   AgoraRTCTokenResponse,
   AgoraRTMTokenResponse,
+  CallCustomerType,
   CallObjectionType,
   CallScorecard,
   CallScorecardRequest,

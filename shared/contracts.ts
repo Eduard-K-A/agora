@@ -9,6 +9,17 @@ export type CallObjectionType =
   | "authority"
   | "none";
 
+export type CallCustomerType =
+  | "buyer"
+  | "inquirer"
+  | "price_sensitive_lead"
+  | "comparison_shopper"
+  | "needs_approval_lead"
+  | "timing_constrained_lead"
+  | "support_existing_customer"
+  | "not_qualified"
+  | "unknown";
+
 export type CallTranscriptEntry = {
   speaker: CallSpeaker;
   text: string;
@@ -45,6 +56,11 @@ export type CallSuggestion = {
   objectionType: CallObjectionType;
   buyingSignal: boolean;
   confidence: number;
+  customerType: CallCustomerType;
+  customerTypeConfidence: number;
+  customerIntent: string;
+  recommendedInfo: string;
+  persuasionTip: string;
   empathyLine: string;
   whisper: string;
   sayThis: string;

@@ -9,6 +9,11 @@ describe("requestCallSuggestion", () => {
         objectionType: "price",
         buyingSignal: false,
         confidence: 0.86,
+        customerType: "price_sensitive_lead",
+        customerTypeConfidence: 0.86,
+        customerIntent: "Understand whether value justifies the cost.",
+        recommendedInfo: "Connect price to saved time and avoided manual work.",
+        persuasionTip: "Anchor on measurable value before discussing discounts.",
         whisper: "Acknowledge the price concern, then reframe around saved time.",
         sayThis: "Totally fair. Most teams feel that at first.",
         nextAction: "Ask what budget range would make this easier to approve."

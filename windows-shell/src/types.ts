@@ -1,6 +1,7 @@
 export type {
   AgoraRTCTokenResponse,
   AgoraRTMTokenResponse,
+  CallCustomerType,
   CallObjectionType,
   CallScorecard,
   CallScorecardRequest,
@@ -14,4 +15,3 @@ export type {
   SalesContext,
   ScreenContextItem
 } from "../../shared/contracts";
-
