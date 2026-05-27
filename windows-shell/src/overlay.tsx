@@ -375,17 +375,24 @@ function Overlay() {
   return (
     <div
       ref={shellRef}
+      className="overlay-shell"
       style={{
         width: 420,
         maxWidth: 420,
+        height: "auto",
+        minHeight: "fit-content",
         margin: 12,
-        padding: 14,
-        borderRadius: 18,
-        background: "rgba(11, 15, 23, 0.96)",
-        color: "white",
-        border: "1px solid rgba(64,156,255,0.4)",
-        boxShadow: "0 24px 64px rgba(0,0,0,0.35)",
-        fontFamily: "Segoe UI, system-ui, sans-serif"
+        padding: 24,
+        paddingBottom: 28,
+        borderRadius: 20,
+        background: "rgba(255, 255, 255, 0.6)",
+        color: "#1f2937",
+        border: "1px solid rgba(255,255,255,0.4)",
+        boxShadow: "0 10px 30px rgba(0,0,0,0.08)",
+        backdropFilter: "blur(20px)",
+        WebkitBackdropFilter: "blur(20px)",
+        fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+        overflowWrap: "break-word"
       }}
     >
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
