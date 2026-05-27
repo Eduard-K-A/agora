@@ -3,7 +3,9 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Extend the Clicky Sales Agent Windows Electron shell with production-grade AI voice capabilities using two distinct voice paths: OpenAI Realtime API for direct whisper coaching in the app, and Agora Voice Calling plus Agora Conversational AI for production live-call routing with a silent AI listener. The Cloudflare Worker remains the API boundary for all key management and sales intelligence. The macOS Swift app is out of scope for this plan - all tasks target the `windows-shell` Electron + React codebase.
+**Goal:** Extend the Clicky Sales Agent Windows Electron shell with production-grade call coaching using Groq for structured suggestions and scorecards, and Agora Voice Calling plus Agora Conversational AI for production live-call routing with a silent AI listener. The Cloudflare Worker remains the API boundary for all key management and sales intelligence. The macOS Swift app is out of scope for this plan - all tasks target the `windows-shell` Electron + React codebase.
+
+AI stack rule: Groq is the only AI provider for reasoning, structured suggestions, and scorecards. Agora is used only for call transport, bot presence, and signaling.
 
 **Architecture Overview:**
 ```
@@ -32,7 +34,7 @@ Even in Direct Coaching Mode, the Worker still mints the ephemeral Realtime sess
 - Agora RTC Web SDK (`agora-rtc-sdk-ng`) for Voice Calling
 - Agora Conversational AI REST API for bot management
 - Agora RTM SDK (`agora-rtm-sdk`) for Signaling and suggestion push
-- OpenAI Realtime API via WebRTC with Worker-minted ephemeral keys for direct speech-to-speech coaching
+- Groq chat completions with structured outputs for call suggestions and scorecards
 - Cloudflare Worker (TypeScript) for token generation and call intelligence
 - AssemblyAI streaming STT as fallback transcription
 - Vitest for unit tests
@@ -44,7 +46,7 @@ Even in Direct Coaching Mode, the Worker still mints the ephemeral Realtime sess
    - Configure the Windows Electron build, shared types, and overlay shell.
    - Add the Worker routes and token-generation plumbing.
 2. Direct Coaching Mode
-   - Implement OpenAI Realtime as the low-latency, in-app whisper path.
+   - Implement Groq-powered structured suggestions and scorecards.
    - Keep this path independent from Agora voice routing.
 3. Production Call Mode
    - Route calls through Agora Voice Calling.
@@ -96,10 +98,10 @@ Use the official docs below before implementing each integration point:
    - Read the RTM / Signaling docs for presence, channel messages, and low-latency event delivery.
    - Use it to push whisper-card payloads and sync overlay state between the bot, Worker, and desktop app.
    - Keep signaling for state transport only; do not put sales reasoning in the transport layer.
-4. OpenAI Realtime API
-   - Read the Realtime overview, WebRTC connection guide, VAD guide, transcription guide, and server-controls guide.
-   - Use WebRTC for the desktop client path and Worker-minted ephemeral access for session creation.
-   - Use this path only for Direct Coaching Mode, not at the same time as the Agora production call path.
+4. Groq API
+   - Read the text generation, structured outputs, responses API, and speech-to-text docs.
+   - Use chat completions with structured outputs for call suggestions and scorecards.
+   - Use this path only for the AI reasoning layer; Agora remains the transport/signaling layer.
 
 ## Development Kickoff
 
