@@ -11,8 +11,14 @@ function createGroqClient(env: Env): Groq {
 
 export async function transcribeAudio(file: File, env: Env): Promise<TranscriptionResponse> {
   const client = createGroqClient(env);
+  const normalizedFile =
+    file.type && file.type.startsWith("audio/")
+      ? file
+      : new File([file], file.name || "audio.webm", {
+          type: file.type.includes("opus") ? "audio/webm;codecs=opus" : "audio/webm"
+        });
   const transcription = await client.audio.transcriptions.create({
-    file,
+    file: normalizedFile,
     model: "whisper-large-v3-turbo",
     response_format: "text",
     temperature: 0

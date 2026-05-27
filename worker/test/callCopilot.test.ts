@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { CallCustomerType, CallObjectionType } from "../src/types";
 
 const createCompletionMock = vi.hoisted(() => vi.fn());
+const transcribeMock = vi.hoisted(() => vi.fn());
 
 vi.mock("groq-sdk", () => ({
   default: vi.fn().mockImplementation(() => ({
@@ -13,7 +14,12 @@ vi.mock("groq-sdk", () => ({
   }))
 }));
 
+vi.mock("../src/transcribe", () => ({
+  transcribeAudio: transcribeMock
+}));
+
 import {
+  buildCallAudioAnalysis,
   buildCallScorecard,
   buildCallSuggestion,
   buildFallbackSuggestion
@@ -26,6 +32,7 @@ const env = {
 describe("callCopilot", () => {
   beforeEach(() => {
     createCompletionMock.mockReset();
+    transcribeMock.mockReset();
   });
 
   it("builds a call suggestion using the extended Groq schema", async () => {
@@ -212,5 +219,75 @@ describe("callCopilot", () => {
 
     expect(scorecard.objections).toContain("price");
     expect(scorecard.recommendedFollowUp.length).toBeGreaterThan(0);
+  });
+
+  it("keeps only customer turns in the ingest pipeline", async () => {
+    transcribeMock.mockResolvedValue({ text: "the price is too high" });
+    createCompletionMock
+      .mockResolvedValueOnce({
+        choices: [
+          {
+            message: {
+              content: JSON.stringify({
+                speaker: "customer",
+                confidence: 0.93,
+                reason: "The chunk reads like a customer objection."
+              })
+            }
+          }
+        ]
+      })
+      .mockResolvedValueOnce({
+      choices: [
+        {
+          message: {
+            content: JSON.stringify({
+              objectionType: "price",
+              buyingSignal: false,
+              confidence: 0.86,
+              customerType: "price_sensitive_lead",
+              customerTypeConfidence: 0.86,
+              customerIntent: "Understand whether value justifies the cost.",
+              recommendedInfo: "Connect price to saved time and avoided manual work.",
+              persuasionTip: "Anchor on measurable value before discussing discounts.",
+              empathyLine: "Totally fair.",
+              whisper: "Acknowledge the price concern, then reframe around saved time.",
+              sayThis: "Totally fair. Most teams feel that at first.",
+              nextQuestion: "What budget range would make this easier to approve?",
+              nextAction: "Ask what budget range would make this easier to approve.",
+              closingMove: "Reframe value, then move to a concrete next step.",
+              reason: "The customer raised a price concern."
+            })
+          }
+        }
+      ]
+    });
+
+    const analysis = await buildCallAudioAnalysis(
+      {
+        source: "system",
+        file: new File(["x".repeat(2048)], "turn.webm"),
+        recentTranscript: [],
+        screenContext: [],
+        salesContext: {
+          companyName: "Clicky Sales Agent",
+          productName: "Clicky Sales Agent",
+          industry: "B2B software",
+          prospectName: "Prospect",
+          dealStage: "discovery",
+          repGoal: "move the customer to a clear next step",
+          targetCloseStep: "book a demo",
+          knownObjections: ["price"],
+          notes: "Prototype test call",
+          tone: "concise, warm, confident"
+        }
+      },
+      env
+    );
+
+    expect(analysis.ignored).toBe(false);
+    expect(analysis.speaker).toBe("customer");
+    expect(analysis.transcriptEntry?.speaker).toBe("customer");
+    expect(analysis.suggestion?.customerType).toBe("price_sensitive_lead");
   });
 });

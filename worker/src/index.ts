@@ -1,9 +1,10 @@
 import type {
+  CallAudioAnalysisRequest,
   CallScorecardRequest,
   CallSuggestionRequest,
   Env
 } from "./types";
-import { buildCallScorecard, buildCallSuggestion } from "./callCopilot";
+import { buildCallAudioAnalysis, buildCallScorecard, buildCallSuggestion } from "./callCopilot";
 import { createRTCStub, createRTMStub, generateChannelName } from "./agoraToken";
 import { transcribeAudio } from "./transcribe";
 
@@ -16,6 +17,18 @@ function json(data: unknown, init?: ResponseInit): Response {
     },
     ...init
   });
+}
+
+function parseJsonFormValue<T>(value: FormDataEntryValue | null, fallback: T): T {
+  if (typeof value !== "string" || value.trim().length === 0) {
+    return fallback;
+  }
+
+  try {
+    return JSON.parse(value) as T;
+  } catch {
+    return fallback;
+  }
 }
 
 export default {
@@ -39,6 +52,34 @@ export default {
     if (request.method === "POST" && url.pathname === "/call/suggest") {
       const payload = (await request.json()) as CallSuggestionRequest;
       return json(await buildCallSuggestion(payload, env));
+    }
+
+    if (request.method === "POST" && url.pathname === "/call/ingest") {
+      const formData = await request.formData();
+      const sourceValue = formData.get("source");
+      const source = sourceValue === "mic" ? "mic" : "system";
+      const file = formData.get("file");
+      if (!(file instanceof File)) {
+        return json({ error: "file is required" }, { status: 400 });
+      }
+
+      const salesContext = parseJsonFormValue<CallAudioAnalysisRequest["salesContext"] | null>(
+        formData.get("salesContext"),
+        null
+      );
+
+      if (!salesContext) {
+        return json({ error: "salesContext is required" }, { status: 400 });
+      }
+
+      const payload: CallAudioAnalysisRequest = {
+        source,
+        recentTranscript: parseJsonFormValue(formData.get("recentTranscript"), [] as CallAudioAnalysisRequest["recentTranscript"]),
+        screenContext: parseJsonFormValue(formData.get("screenContext"), []),
+        salesContext
+      };
+
+      return json(await buildCallAudioAnalysis({ ...payload, file }, env));
     }
 
     if (request.method === "POST" && url.pathname === "/call/scorecard") {

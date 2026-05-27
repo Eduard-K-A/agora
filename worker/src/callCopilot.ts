@@ -1,14 +1,20 @@
 import Groq from "groq-sdk";
 import type {
+  CallAudioAnalysisRequest,
+  CallAudioAnalysisResponse,
+  CallCustomerNeedCategory,
   CallCustomerType,
   CallObjectionType,
   CallScorecard,
   CallScorecardRequest,
+  CallSpeaker,
   CallSuggestion,
   CallSuggestionRequest,
+  CallTranscriptEntry,
   Env
 } from "./types";
 import { salesPlaybook } from "./salesPlaybook";
+import { transcribeAudio } from "./transcribe";
 
 const suggestionSchema = {
   type: "object",
@@ -79,6 +85,35 @@ const scorecardSchema = {
   required: ["summary", "objections", "buyingSignals", "scriptsUsed", "recommendedFollowUp", "repCoaching"]
 } as const;
 
+const turnClassificationSchema = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    speaker: {
+      type: "string",
+      enum: ["customer", "agent", "unknown"]
+    },
+    confidence: { type: "number" },
+    reason: { type: "string" }
+  },
+  required: ["speaker", "confidence", "reason"]
+} as const;
+
+const customerNeedSchema = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    category: {
+      type: "string",
+      enum: ["pricing", "timing", "approval", "comparison", "education", "trust", "support", "purchase_ready", "unclear"]
+    },
+    summary: { type: "string" },
+    confidence: { type: "number" },
+    reason: { type: "string" }
+  },
+  required: ["category", "summary", "confidence", "reason"]
+} as const;
+
 function createGroqClient(env: Env): Groq {
   if (!env.GROQ_API_KEY) {
     throw new Error("GROQ_API_KEY is missing");
@@ -93,6 +128,275 @@ type FallbackSuggestionDraft = Omit<CallSuggestion, "reason">;
 
 function includesAny(text: string, terms: string[]): boolean {
   return terms.some((term) => text.includes(term));
+}
+
+function createCustomerTranscriptEntry(text: string): CallTranscriptEntry {
+  return {
+    speaker: "customer",
+    text: text.trim(),
+    timestampISO: new Date().toISOString()
+  };
+}
+
+function classifyCustomerTurnFallback(text: string): {
+  speaker: CallSpeaker;
+  confidence: number;
+  reason: string;
+} {
+  const normalized = text.toLowerCase();
+
+  if (
+    includesAny(normalized, [
+      "i need",
+      "we need",
+      "our team",
+      "my manager",
+      "our budget",
+      "how much",
+      "how does this work",
+      "what do you offer",
+      "we are comparing",
+      "we're comparing",
+      "too expensive",
+      "not now",
+      "next quarter",
+      "can you explain",
+      "show me",
+      "tell me more"
+    ])
+  ) {
+    return {
+      speaker: "customer",
+      confidence: 0.68,
+      reason: "The chunk reads like a prospect asking about fit, price, timing, or next steps."
+    };
+  }
+
+  if (
+    includesAny(normalized, [
+      "i can send",
+      "let me",
+      "happy to",
+      "thanks for",
+      "the next step",
+      "book time",
+      "we can",
+      "i'll follow up",
+      "i will follow up"
+    ])
+  ) {
+    return {
+      speaker: "agent",
+      confidence: 0.64,
+      reason: "The chunk reads like rep follow-up language or a next-step commitment."
+    };
+  }
+
+  return {
+    speaker: "unknown",
+    confidence: 0.42,
+    reason: "The chunk did not contain enough evidence to identify the speaker reliably."
+  };
+}
+
+function classifyCustomerNeedFallback(text: string): {
+  category: CallCustomerNeedCategory;
+  summary: string;
+  confidence: number;
+  reason: string;
+} {
+  const normalized = text.toLowerCase();
+
+  if (includesAny(normalized, ["price", "cost", "budget", "expensive", "discount", "cheaper"])) {
+    return {
+      category: "pricing",
+      summary: "The customer is evaluating price or budget fit.",
+      confidence: 0.9,
+      reason: "The transcript contains pricing language."
+    };
+  }
+
+  if (includesAny(normalized, ["later", "next quarter", "timing", "busy", "not now", "timeline"])) {
+    return {
+      category: "timing",
+      summary: "The customer wants to delay the decision or implementation.",
+      confidence: 0.88,
+      reason: "The transcript contains timing language."
+    };
+  }
+
+  if (includesAny(normalized, ["manager", "approval", "decision", "boss", "procurement", "legal", "committee"])) {
+    return {
+      category: "approval",
+      summary: "The customer needs internal approval or stakeholder alignment.",
+      confidence: 0.88,
+      reason: "The transcript contains approval language."
+    };
+  }
+
+  if (includesAny(normalized, ["competitor", "comparing", "comparison", "versus", "alternative"])) {
+    return {
+      category: "comparison",
+      summary: "The customer is comparing this offer with another option.",
+      confidence: 0.87,
+      reason: "The transcript contains comparison language."
+    };
+  }
+
+  if (includesAny(normalized, ["how does", "how do", "what is", "explain", "learn more", "understand"])) {
+    return {
+      category: "education",
+      summary: "The customer is trying to understand how the product works.",
+      confidence: 0.85,
+      reason: "The transcript contains educational language."
+    };
+  }
+
+  if (includesAny(normalized, ["trust", "risk", "security", "compliance", "privacy"])) {
+    return {
+      category: "trust",
+      summary: "The customer is checking trust, risk, or security concerns.",
+      confidence: 0.84,
+      reason: "The transcript contains trust language."
+    };
+  }
+
+  if (includesAny(normalized, ["support", "issue", "bug", "invoice", "renewal", "account"])) {
+    return {
+      category: "support",
+      summary: "The customer seems to need support or account help.",
+      confidence: 0.84,
+      reason: "The transcript contains support language."
+    };
+  }
+
+  if (includesAny(normalized, ["buy", "purchase", "sign", "get started", "move forward", "next steps"])) {
+    return {
+      category: "purchase_ready",
+      summary: "The customer is signaling readiness for the next buying step.",
+      confidence: 0.8,
+      reason: "The transcript contains purchase-ready language."
+    };
+  }
+
+  return {
+    category: "unclear",
+    summary: "The customer's exact need is still unclear.",
+    confidence: 0.52,
+    reason: "The transcript does not clearly reveal the customer's intent."
+  };
+}
+
+async function classifyCustomerNeed(
+  request: CallAudioAnalysisRequest & { transcriptText: string },
+  env: Env
+): Promise<{ category: CallCustomerNeedCategory; summary: string; confidence: number; reason: string }> {
+  const fallback = classifyCustomerNeedFallback(request.transcriptText);
+
+  const systemPrompt = [
+    "Classify the customer's primary need from a live sales-call transcript chunk.",
+    "Choose the single best category: pricing, timing, approval, comparison, education, trust, support, purchase_ready, or unclear.",
+    "Use the recent transcript and conversation state only as hints.",
+    "Return a short summary that a rep can act on immediately.",
+    "Return only JSON that matches the schema."
+  ].join(" ");
+
+  try {
+    const client = createGroqClient(env);
+    const response = await client.chat.completions.create({
+      model: "openai/gpt-oss-20b",
+      messages: [
+        {
+          role: "system",
+          content: systemPrompt
+        },
+        {
+          role: "user",
+          content: JSON.stringify({
+            transcriptText: request.transcriptText,
+            recentTranscript: request.recentTranscript.slice(-8),
+            screenContext: request.screenContext,
+            salesContext: request.salesContext,
+            conversationState: request.conversationState ?? null
+          })
+        }
+      ],
+      response_format: {
+        type: "json_schema",
+        json_schema: {
+          name: "customer_need",
+          strict: true,
+          schema: customerNeedSchema
+        }
+      }
+    });
+
+    const parsed = await parseJsonContent<{
+      category: CallCustomerNeedCategory;
+      summary: string;
+      confidence: number;
+      reason: string;
+    }>(response.choices[0]?.message?.content);
+
+    return parsed ?? fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+async function classifyCustomerTurn(
+  request: CallAudioAnalysisRequest & { transcriptText: string },
+  env: Env
+): Promise<{ speaker: CallSpeaker; confidence: number; reason: string }> {
+  const fallback = classifyCustomerTurnFallback(request.transcriptText);
+
+  const systemPrompt = [
+    "You classify a single transcribed audio chunk from a live sales call.",
+    "The audio comes from the call stream, so the chunk may be customer speech, rep speech, or unclear.",
+    "Classify the latest speaker only. Do not guess beyond the evidence.",
+    "Return customer when the speaker is the prospect/customer.",
+    "Return agent when the speaker is the sales rep.",
+    "Return unknown when the chunk is too ambiguous.",
+    "Use the recent transcript and sales context only as hints.",
+    "Return only JSON that matches the schema."
+  ].join(" ");
+
+  try {
+    const client = createGroqClient(env);
+    const response = await client.chat.completions.create({
+      model: "openai/gpt-oss-20b",
+      messages: [
+        {
+          role: "system",
+          content: systemPrompt
+        },
+        {
+          role: "user",
+          content: JSON.stringify({
+            transcriptText: request.transcriptText,
+            recentTranscript: request.recentTranscript.slice(-8),
+            screenContext: request.screenContext,
+            salesContext: request.salesContext
+          })
+        }
+      ],
+      response_format: {
+        type: "json_schema",
+        json_schema: {
+          name: "turn_classification",
+          strict: true,
+          schema: turnClassificationSchema
+        }
+      }
+    });
+
+    const parsed = await parseJsonContent<{ speaker: CallSpeaker; confidence: number; reason: string }>(
+      response.choices[0]?.message?.content
+    );
+    return parsed ?? fallback;
+  } catch {
+    return fallback;
+  }
 }
 
 function getPlaybookCopy(objectionType: CallObjectionType) {
@@ -375,6 +679,7 @@ export async function buildCallSuggestion(
     "Your job is to help the rep move the call toward one concrete next step.",
     "Classify the caller/customer type as buyer, inquirer, price_sensitive_lead, comparison_shopper, needs_approval_lead, timing_constrained_lead, support_existing_customer, not_qualified, or unknown.",
     "Identify the customer's intent and the exact information the rep should give next.",
+    "If a conversation state is provided, use it to preserve the customer's current need across turns.",
     "Give a persuasive tip that helps the rep ethically move the customer toward the next concrete step.",
     "Be concise, specific, calm, and persuasive without being pushy.",
     "Use the provided sales context and transcript. Do not invent facts.",
@@ -397,7 +702,8 @@ export async function buildCallSuggestion(
             latestUtterance: request.latestUtterance,
             recentTranscript: request.recentTranscript.slice(-8),
             screenContext: request.screenContext,
-            salesContext: request.salesContext
+            salesContext: request.salesContext,
+            conversationState: request.conversationState ?? null
           })
         }
       ],
@@ -465,4 +771,109 @@ export async function buildCallScorecard(
       repCoaching: "No coaching available."
     }
   );
+}
+
+export async function buildCallAudioAnalysis(
+  request: CallAudioAnalysisRequest & { file: File },
+  env: Env
+): Promise<CallAudioAnalysisResponse> {
+  let transcription: { text: string };
+
+  try {
+    transcription = await transcribeAudio(request.file, env);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Transcription failed";
+    if (message.includes("could not process file") || message.includes("invalid_request_error")) {
+      return {
+        transcriptText: "",
+        source: request.source,
+        speaker: "unknown",
+        speakerConfidence: 0,
+        reason: `Groq could not process the audio chunk: ${message}`,
+        ignored: true,
+        transcriptEntry: undefined
+      };
+    }
+
+    throw error;
+  }
+
+  const transcriptText = transcription.text.trim();
+
+  if (!transcriptText) {
+    return {
+      transcriptText: "",
+      source: request.source,
+      speaker: "unknown",
+      speakerConfidence: 0,
+      reason: "The audio chunk did not produce transcribable speech.",
+      ignored: true,
+      transcriptEntry: undefined
+    };
+  }
+
+  const speaker = request.source === "mic" ? "agent" : "customer";
+  const transcriptEntry: CallTranscriptEntry = {
+    speaker,
+    text: transcriptText,
+    timestampISO: new Date().toISOString()
+  };
+
+  if (speaker === "agent") {
+    return {
+      transcriptText,
+      source: request.source,
+      speaker,
+      speakerConfidence: 1,
+      reason: "Device microphone mapped to representative speech.",
+      ignored: false,
+      transcriptEntry
+    };
+  }
+
+  const customerNeed = await classifyCustomerNeed(
+    {
+      source: request.source,
+      transcriptText,
+      recentTranscript: request.recentTranscript,
+      screenContext: request.screenContext,
+      salesContext: request.salesContext,
+      conversationState: request.conversationState
+    },
+    env
+  );
+
+  const updatedTranscript = [...request.recentTranscript, transcriptEntry].slice(-20);
+  const suggestion = await buildCallSuggestion(
+    {
+      mode: "call_copilot",
+      latestUtterance: transcriptText,
+      recentTranscript: updatedTranscript,
+      screenContext: request.screenContext,
+      salesContext: request.salesContext,
+      conversationState: {
+        summary: customerNeed.summary,
+        lastCustomerUtterance: transcriptText,
+        lastCustomerIntent: customerNeed.summary,
+        lastCustomerNeedCategory: customerNeed.category,
+        lastCustomerType: "unknown",
+        confidence: customerNeed.confidence,
+        lastUpdatedISO: transcriptEntry.timestampISO
+      }
+    },
+    env
+  );
+
+  return {
+    transcriptText,
+    source: request.source,
+    speaker,
+    speakerConfidence: 1,
+    reason: "System audio mapped to customer speech.",
+    ignored: false,
+    transcriptEntry,
+    customerNeedCategory: customerNeed.category,
+    customerNeedSummary: customerNeed.summary,
+    suggestion
+  };
 }

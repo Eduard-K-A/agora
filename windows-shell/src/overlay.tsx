@@ -64,6 +64,7 @@ function speakerLabel(entry: CallTranscriptEntry): string {
 
 function Overlay() {
   const workerBaseUrl = window.clickySales?.getWorkerBaseUrl() ?? "";
+  const [mode, setMode] = useState<"openai_direct" | "agora_bot">("openai_direct");
   const [voiceState, setVoiceState] = useState<VoiceState>("idle");
   const [isListening, setIsListening] = useState(false);
   const [captureStatus, setCaptureStatus] = useState<LiveAudioCaptureStatus>(initialCaptureStatus);
@@ -252,12 +253,21 @@ function Overlay() {
     }}>
       <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 10 }}>
         <strong>Clicky Sales</strong>
-        <span style={{ fontSize: 12, opacity: 0.8 }}>Live call</span>
+        <span style={{ fontSize: 12, opacity: 0.8 }}>{mode === "openai_direct" ? "Demo Coach" : "Live Call"}</span>
+      </div>
+
+      <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
+        <button onClick={() => setMode("openai_direct")} aria-pressed={mode === "openai_direct"}>
+          Demo Coach
+        </button>
+        <button onClick={() => setMode("agora_bot")} aria-pressed={mode === "agora_bot"}>
+          Live Call
+        </button>
       </div>
 
       <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
         <button onClick={handleStartListening} disabled={isListening || voiceState === "starting"}>
-          {voiceState === "starting" ? "Starting..." : "Start live listening"}
+          {voiceState === "starting" ? "Starting..." : isListening ? "Listening..." : "Start live listening"}
         </button>
         <button onClick={handleStopListening} disabled={!isListening}>
           Stop
