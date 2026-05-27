@@ -335,7 +335,7 @@ function Overlay() {
           </button>
           <button
             type="button"
-            className="ui-button"
+            className="ui-button window-close-button"
             onMouseDown={(event) => event.stopPropagation()}
             onClick={handleClose}
             style={{
