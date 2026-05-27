@@ -78,6 +78,60 @@ function speakerLabel(entry: CallTranscriptEntry): string {
   return "Unknown";
 }
 
+function CaptureStatusBadge({ label, status }: { label: string; status: LiveAudioSourceStatus }) {
+  const isLoading = status === "starting";
+  const isError = status === "blocked" || status === "error";
+  const isActive = status === "active";
+
+  return (
+    <div
+      className={`capture-status${isLoading ? " is-loading" : ""}`}
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 7,
+        minHeight: 29,
+        padding: "6px 10px",
+        borderRadius: 999,
+        background: isError
+          ? "rgba(254,226,226,0.72)"
+          : isLoading
+            ? "rgba(254,243,199,0.66)"
+            : "rgba(255,255,255,0.55)",
+        border: isError
+          ? "1px solid rgba(248,113,113,0.2)"
+          : "1px solid rgba(255,255,255,0.62)",
+        color: "#64748b",
+        fontSize: 12,
+        lineHeight: 1.2,
+        fontWeight: 500
+      }}
+    >
+      <span
+        className="capture-status-dot"
+        style={{
+          width: 7,
+          height: 7,
+          flexShrink: 0,
+          borderRadius: 999,
+          background: statusColor(status),
+          boxShadow: isActive
+            ? "0 0 8px rgba(34,197,94,0.72)"
+            : isLoading
+              ? "0 0 8px rgba(245,158,11,0.38)"
+              : isError
+                ? "0 0 7px rgba(239,68,68,0.32)"
+                : "none"
+        }}
+      />
+      <span>{label}:</span>
+      <span style={{ color: isError ? "#b91c1c" : "#334155", fontWeight: 600, textTransform: "capitalize" }}>
+        {status}
+      </span>
+    </div>
+  );
+}
+
 function Overlay() {
   const appBridge = window.elySales;
   const workerBaseUrl = appBridge?.getWorkerBaseUrl() ?? "";
@@ -468,7 +522,8 @@ function Overlay() {
               lineHeight: 1,
               fontWeight: 600,
               textTransform: "capitalize",
-              whiteSpace: "nowrap"
+              whiteSpace: "nowrap",
+              transition: "all 0.25s cubic-bezier(0.25, 0.8, 0.25, 1)"
             }}
           >
             {statusLabel}
@@ -522,78 +577,92 @@ function Overlay() {
 
       <div
         style={{
-          display: "grid",
-          gridTemplateColumns: "auto auto auto",
-          gap: 8,
-          marginBottom: 10
+          marginBottom: 14,
+          padding: 12,
+          borderRadius: 16,
+          background: "rgba(255,255,255,0.34)",
+          border: "1px solid rgba(255,255,255,0.5)",
+          boxShadow: "inset 0 1px 2px rgba(255,255,255,0.72), 0 6px 18px rgba(15,23,42,0.04)",
+          ...noDragRegionStyle
         }}
       >
-        <button
-          onClick={handleStartListening}
-          disabled={isListening || voiceState === "starting" || voiceState === "transcribing" || voiceState === "suggesting"}
+        <div
           style={{
-            padding: "9px 12px",
-            borderRadius: 12,
-            border: "1px solid rgba(96,165,250,0.5)",
-            background: "rgba(64,156,255,0.14)",
-            color: "white",
-            fontWeight: 700,
-            cursor: "pointer",
-            opacity:
-              isListening || voiceState === "starting" || voiceState === "transcribing" || voiceState === "suggesting"
-                ? 0.7
-                : 1
+            display: "grid",
+            gridTemplateColumns: "minmax(0, 1.35fr) minmax(0, 0.72fr) minmax(0, 0.9fr)",
+            gap: 8,
+            marginBottom: 12
           }}
         >
-          {voiceState === "starting" ? "Starting..." : isListening ? "Listening..." : "Start Listening"}
-        </button>
-        <button
-          onClick={handleStopListening}
-          disabled={!isListening}
-          style={{
-            padding: "9px 12px",
-            borderRadius: 12,
-            border: "1px solid rgba(255,255,255,0.12)",
-            background: "rgba(255,255,255,0.06)",
-            color: "white",
-            cursor: "pointer",
-            opacity: !isListening ? 0.55 : 1
-          }}
-        >
-          Stop
-        </button>
-        <button
-          onClick={handleGenerateSummary}
-          disabled={transcript.length === 0 || isListening || isGeneratingSummary}
-          style={{
-            padding: "9px 12px",
-            borderRadius: 12,
-            border: "1px solid rgba(255,255,255,0.12)",
-            background: "rgba(255,255,255,0.06)",
-            color: "white",
-            cursor: "pointer",
-            opacity: transcript.length === 0 || isListening || isGeneratingSummary ? 0.55 : 1
-          }}
-        >
-          {isGeneratingSummary ? "Summarizing..." : "Summary"}
-        </button>
-      </div>
-
-      <div
-        style={{
-          display: "flex",
-          gap: 8,
-          marginBottom: 10,
-          fontSize: 12,
-          opacity: 0.82
-        }}
-      >
-        <div>
-          Rep mic: <span style={{ color: statusColor(captureStatus.mic), fontWeight: 600 }}>{captureStatus.mic}</span>
+          <button
+            type="button"
+            className="ui-button primary-control"
+            onClick={handleStartListening}
+            disabled={isListening || voiceState === "starting" || voiceState === "transcribing" || voiceState === "suggesting"}
+            style={{
+              minHeight: 40,
+              padding: "9px 12px",
+              borderRadius: 12,
+              border: "1px solid rgba(147,197,253,0.46)",
+              background: "rgba(239,246,255,0.9)",
+              color: "#2563eb",
+              boxShadow: "inset 0 1px 0 rgba(255,255,255,0.94), 0 7px 18px rgba(59,130,246,0.12)",
+              fontWeight: 650,
+              cursor: "pointer",
+              opacity:
+                isListening || voiceState === "starting" || voiceState === "transcribing" || voiceState === "suggesting"
+                  ? 0.66
+                  : 1,
+              ...noDragRegionStyle
+            }}
+          >
+            {voiceState === "starting" ? "Starting..." : isListening ? "Listening..." : "Start Listening"}
+          </button>
+          <button
+            type="button"
+            className="ui-button secondary-control"
+            onClick={handleStopListening}
+            disabled={!isListening}
+            style={{
+              minHeight: 40,
+              padding: "9px 12px",
+              borderRadius: 12,
+              border: "1px solid rgba(255,255,255,0.62)",
+              background: "rgba(241,245,249,0.54)",
+              color: "#475569",
+              boxShadow: "inset 0 1px 0 rgba(255,255,255,0.72)",
+              cursor: "pointer",
+              opacity: !isListening ? 0.48 : 1,
+              ...noDragRegionStyle
+            }}
+          >
+            Stop
+          </button>
+          <button
+            type="button"
+            className="ui-button secondary-control"
+            onClick={handleGenerateSummary}
+            disabled={transcript.length === 0 || isListening || isGeneratingSummary}
+            style={{
+              minHeight: 40,
+              padding: "9px 12px",
+              borderRadius: 12,
+              border: "1px solid rgba(255,255,255,0.62)",
+              background: "rgba(241,245,249,0.54)",
+              color: "#475569",
+              boxShadow: "inset 0 1px 0 rgba(255,255,255,0.72)",
+              cursor: "pointer",
+              opacity: transcript.length === 0 || isListening || isGeneratingSummary ? 0.48 : 1,
+              ...noDragRegionStyle
+            }}
+          >
+            {isGeneratingSummary ? "Summarizing..." : "Summary"}
+          </button>
         </div>
-        <div>
-          Customer stream:{" "}
-          <span style={{ color: statusColor(captureStatus.system), fontWeight: 600 }}>{captureStatus.system}</span>
+
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+          <CaptureStatusBadge label="Rep mic" status={captureStatus.mic} />
+          <CaptureStatusBadge label="Customer stream" status={captureStatus.system} />
         </div>
       </div>
 

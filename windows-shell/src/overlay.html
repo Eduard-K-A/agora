@@ -39,11 +39,21 @@
 
       .ui-button {
         transform: translateY(0) scale(1);
-        transition: all 0.2s ease-in-out;
+        transition: all 0.25s cubic-bezier(0.25, 0.8, 0.25, 1);
       }
 
       .ui-button:not(:disabled):hover {
         transform: translateY(-1px) scale(1.015);
+      }
+
+      .primary-control:not(:disabled):hover {
+        background: rgba(219, 234, 254, 0.96) !important;
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.94), 0 10px 22px rgba(59, 130, 246, 0.19) !important;
+      }
+
+      .secondary-control:not(:disabled):hover {
+        background: rgba(255, 255, 255, 0.76) !important;
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.84), 0 5px 13px rgba(15, 23, 42, 0.06) !important;
       }
 
       .window-close-button:not(:disabled):hover {
@@ -60,17 +70,22 @@
         transform: none;
       }
 
-      .mic-toggle.is-recording {
-        animation: recordingPulse 1.4s ease-in-out infinite;
+      .capture-status,
+      .capture-status-dot {
+        transition: all 0.25s cubic-bezier(0.25, 0.8, 0.25, 1);
       }
 
-      @keyframes recordingPulse {
+      .capture-status.is-loading {
+        animation: statusPulse 1.3s ease-in-out infinite;
+      }
+
+      @keyframes statusPulse {
         0%, 100% {
-          box-shadow: 0 10px 24px rgba(248,113,113,0.22), inset 0 1px 0 rgba(255,255,255,0.9);
+          opacity: 0.72;
         }
 
         50% {
-          box-shadow: 0 12px 30px rgba(248,113,113,0.38), inset 0 1px 0 rgba(255,255,255,0.9);
+          opacity: 1;
         }
       }
     </style>
