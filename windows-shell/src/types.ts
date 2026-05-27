@@ -9,9 +9,13 @@ export type {
   CallSpeaker,
   CallSuggestion,
   CallSuggestionRequest,
+  CallAudioAnalysisRequest,
+  CallAudioAnalysisResponse,
   CallTranscriptEntry,
+  CallCustomerNeedCategory,
+  LiveCallAudioSource,
+  LiveConversationState,
   RealtimeSessionTokenResponse,
-  RealtimeVoiceMode,
   SalesContext,
   ScreenContextItem
 } from "../../shared/contracts";

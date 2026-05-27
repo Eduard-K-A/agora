@@ -1,4 +1,4 @@
-import { app, BrowserWindow, Menu, Tray, desktopCapturer, ipcMain, session } from "electron";
+import { app, BrowserWindow, Menu, Tray, ipcMain, session } from "electron";
 import fs from "node:fs";
 import path from "node:path";
 
@@ -7,27 +7,15 @@ let tray: Tray | null = null;
 let isQuitting = false;
 
 function configureDisplayMediaHandler() {
-  session.defaultSession.setDisplayMediaRequestHandler((_, callback) => {
-    void desktopCapturer
-      .getSources({
-        types: ["screen"],
-        thumbnailSize: { width: 0, height: 0 }
-      })
-      .then((sources) => {
-        const screenSource = sources[0];
-        if (!screenSource) {
-          callback({});
-          return;
-        }
+  session.defaultSession.setDisplayMediaRequestHandler((request, callback) => {
+    if (!request.audioRequested) {
+      callback({});
+      return;
+    }
 
-        callback({
-          video: screenSource,
-          audio: "loopback"
-        });
-      })
-      .catch(() => {
-        callback({});
-      });
+    callback({
+      audio: "loopback"
+    });
   });
 }
 
@@ -78,13 +66,15 @@ function createOverlayWindow() {
   const overlayPath = path.join(__dirname, "../renderer/overlay.html");
 
   overlayWindow = new BrowserWindow({
-    width: 360,
-    height: 560,
+    width: 420,
+    height: 760,
     frame: false,
     transparent: true,
     alwaysOnTop: true,
     skipTaskbar: true,
-    resizable: false,
+    resizable: true,
+    minWidth: 360,
+    minHeight: 560,
     webPreferences: {
       preload: preloadPath
     }

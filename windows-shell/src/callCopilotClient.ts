@@ -1,76 +1,122 @@
 import type {
+  CallAudioAnalysisResponse,
   CallScorecard,
-  CallScorecardRequest,
   CallSuggestion,
-  CallSuggestionRequest
+  CallTranscriptEntry,
+  LiveConversationState
 } from "./types";
 
-export type RequestCallSuggestionInput = CallSuggestionRequest & {
-  workerBaseUrl: string;
-  fetchImpl?: typeof fetch;
-};
-
-export async function requestCallSuggestion(input: RequestCallSuggestionInput): Promise<CallSuggestion> {
-  const fetchImpl = input.fetchImpl ?? fetch;
-  const response = await fetchImpl(`${input.workerBaseUrl}/call/suggest`, {
+async function postJson<TResponse>(
+  workerBaseUrl: string,
+  path: string,
+  body: Record<string, unknown>,
+  fetchImpl: typeof fetch = fetch
+): Promise<TResponse> {
+  const response = await fetchImpl(`${workerBaseUrl}${path}`, {
     method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({
-      mode: input.mode,
-      latestUtterance: input.latestUtterance,
-      recentTranscript: input.recentTranscript,
-      screenContext: input.screenContext,
-      salesContext: input.salesContext
-    } satisfies CallSuggestionRequest)
+    headers: {
+      "content-type": "application/json"
+    },
+    body: JSON.stringify(body)
   });
 
   if (!response.ok) {
-    throw new Error(`Call suggestion failed with HTTP ${response.status}`);
+    throw new Error(`Request to ${path} failed with HTTP ${response.status}`);
   }
 
-  return (await response.json()) as CallSuggestion;
+  return response.json() as Promise<TResponse>;
 }
 
-export type RequestScorecardInput = CallScorecardRequest & {
-  workerBaseUrl: string;
-  fetchImpl?: typeof fetch;
-};
+function resolveAudioFile(input: { file: Blob; mimeType?: string }): File {
+  const resolvedMimeType =
+    input.mimeType?.startsWith("audio/")
+      ? input.mimeType
+      : input.file.type.startsWith("audio/")
+        ? input.file.type
+        : input.mimeType?.includes("opus")
+          ? "audio/webm;codecs=opus"
+          : "audio/wav";
 
-export async function requestScorecard(input: RequestScorecardInput): Promise<CallScorecard> {
+  const filename = resolvedMimeType.includes("wav")
+    ? "call.wav"
+    : resolvedMimeType.includes("ogg")
+      ? "call.ogg"
+      : resolvedMimeType.includes("mp4")
+        ? "call.m4a"
+        : "call.webm";
+
+  return new File([input.file], filename, { type: resolvedMimeType });
+}
+
+export async function requestCallSuggestion(input: {
+  workerBaseUrl: string;
+  mode: "direct_coaching" | "call_copilot";
+  latestUtterance: string;
+  recentTranscript: CallTranscriptEntry[];
+  screenContext: Array<{ label: string; summary: string }>;
+  salesContext: Record<string, unknown>;
+  conversationState?: LiveConversationState | null;
+  fetchImpl?: typeof fetch;
+}): Promise<CallSuggestion> {
   const fetchImpl = input.fetchImpl ?? fetch;
-  const response = await fetchImpl(`${input.workerBaseUrl}/call/scorecard`, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({
+  return postJson<CallSuggestion>(input.workerBaseUrl, "/call/suggest", {
+    mode: input.mode,
+    latestUtterance: input.latestUtterance,
+    recentTranscript: input.recentTranscript,
+    screenContext: input.screenContext,
+    salesContext: input.salesContext,
+    conversationState: input.conversationState ?? undefined,
+    fetchImpl
+  });
+}
+
+export async function requestScorecard(input: {
+  workerBaseUrl: string;
+  recentTranscript: CallTranscriptEntry[];
+  fetchImpl?: typeof fetch;
+}): Promise<CallScorecard> {
+  const fetchImpl = input.fetchImpl ?? fetch;
+  return postJson<CallScorecard>(
+    input.workerBaseUrl,
+    "/call/scorecard",
+    {
       recentTranscript: input.recentTranscript
-    } satisfies CallScorecardRequest)
-  });
-
-  if (!response.ok) {
-    throw new Error(`Call scorecard failed with HTTP ${response.status}`);
-  }
-
-  return (await response.json()) as CallScorecard;
+    },
+    fetchImpl
+  );
 }
 
-export async function requestTranscription(input: {
+export async function requestLiveCallAnalysis(input: {
   workerBaseUrl: string;
+  source: "mic" | "system";
   file: Blob;
+  mimeType?: string;
+  recentTranscript: CallTranscriptEntry[];
+  screenContext: Array<{ label: string; summary: string }>;
+  salesContext: Record<string, unknown>;
+  conversationState?: LiveConversationState | null;
   fetchImpl?: typeof fetch;
-}): Promise<string> {
+}): Promise<CallAudioAnalysisResponse> {
   const fetchImpl = input.fetchImpl ?? fetch;
   const formData = new FormData();
-  formData.append("file", input.file, "recording.webm");
+  formData.append("source", input.source);
+  formData.append("file", resolveAudioFile({ file: input.file, mimeType: input.mimeType }));
+  formData.append("recentTranscript", JSON.stringify(input.recentTranscript));
+  formData.append("screenContext", JSON.stringify(input.screenContext));
+  formData.append("salesContext", JSON.stringify(input.salesContext));
 
-  const response = await fetchImpl(`${input.workerBaseUrl}/transcribe`, {
+  if (input.conversationState) {
+    formData.append("conversationState", JSON.stringify(input.conversationState));
+  }
+
+  const response = await fetchImpl(`${input.workerBaseUrl}/call/ingest`, {
     method: "POST",
     body: formData
   });
 
   if (!response.ok) {
-    throw new Error(`Transcription failed with HTTP ${response.status}`);
+    throw new Error(`Live call analysis failed with HTTP ${response.status}`);
   }
 
-  const result = (await response.json()) as { text?: string };
-  return result.text ?? "";
+  return response.json() as Promise<CallAudioAnalysisResponse>;
 }
