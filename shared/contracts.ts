@@ -20,15 +20,38 @@ export type CallCustomerType =
   | "not_qualified"
   | "unknown";
 
+export type CallCustomerNeedCategory =
+  | "pricing"
+  | "timing"
+  | "approval"
+  | "comparison"
+  | "education"
+  | "trust"
+  | "support"
+  | "purchase_ready"
+  | "unclear";
+
 export type CallTranscriptEntry = {
   speaker: CallSpeaker;
   text: string;
   timestampISO: string;
 };
 
+export type LiveCallAudioSource = "mic" | "system";
+
 export type ScreenContextItem = {
   label: string;
   summary?: string;
+};
+
+export type LiveConversationState = {
+  summary: string;
+  lastCustomerUtterance: string;
+  lastCustomerIntent: string;
+  lastCustomerNeedCategory: CallCustomerNeedCategory;
+  lastCustomerType: CallCustomerType;
+  confidence: number;
+  lastUpdatedISO: string;
 };
 
 export type SalesContext = {
@@ -50,6 +73,29 @@ export type CallSuggestionRequest = {
   recentTranscript: CallTranscriptEntry[];
   screenContext: ScreenContextItem[];
   salesContext: SalesContext;
+  conversationState?: LiveConversationState;
+};
+
+export type CallAudioAnalysisRequest = {
+  source: LiveCallAudioSource;
+  recentTranscript: CallTranscriptEntry[];
+  screenContext: ScreenContextItem[];
+  salesContext: SalesContext;
+  conversationState?: LiveConversationState;
+};
+
+export type CallAudioAnalysisResponse = {
+  transcriptText: string;
+  source: LiveCallAudioSource;
+  speaker: CallSpeaker;
+  speakerConfidence: number;
+  reason: string;
+  ignored: boolean;
+  transcriptEntry?: CallTranscriptEntry;
+  customerNeedCategory?: CallCustomerNeedCategory;
+  customerNeedSummary?: string;
+  customerTranscriptEntry?: CallTranscriptEntry;
+  suggestion?: CallSuggestion;
 };
 
 export type CallSuggestion = {
@@ -112,5 +158,3 @@ export type CallSessionStatus =
   | "bot_live"
   | "ending"
   | "scored";
-
-export type RealtimeVoiceMode = "openai_direct" | "agora_bot";

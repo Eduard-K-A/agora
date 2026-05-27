@@ -4,23 +4,22 @@ Desktop voice sales assistant prototype built from a Cloudflare Worker and a cro
 
 ## What It Does
 
-- Records microphone input from the Electron overlay
-- Sends audio to the Worker for transcription
-- Uses Groq for structured sales suggestions and scorecards
+- Captures live call/system audio from the Electron overlay
+- Sends audio chunks to the Worker for server-side transcription and speaker-turn classification
+- Keeps only customer turns for coaching context
+- Uses Groq for transcription, structured sales suggestions, and scorecards
 - Displays whisper-style coaching cards in the overlay
-- Includes demo mode selectors for `Direct` and `Agora Bot`
 
 ## Current AI And Voice Stack
 
-- Groq for transcription, sales suggestions, and scorecards
+- Groq for transcription, speaker-turn classification, sales suggestions, and scorecards
+- The Worker owns the customer-only stream processing step
 - Agora reserved for future live-call transport and signaling
-- No Anthropic dependency
-- No OpenAI dependency in the current prototype
 
 ## Project Structure
 
-- `worker` - Cloudflare Worker for transcription, suggestion, and scorecard routes
-- `windows-shell` - Electron overlay and push-to-talk microphone UI
+- `worker` - Cloudflare Worker for audio ingest, speaker classification, suggestion, and scorecard routes
+- `windows-shell` - Electron overlay that captures live call audio and streams it to the Worker
 - `shared` - shared TypeScript contracts between the Worker and shell
 
 ## Setup
@@ -66,22 +65,11 @@ npm run dev -w windows-shell
 
 ## How To Test
 
-1. Click `Start Mic`
-2. Speak a short utterance such as `the price is too high`
+1. Click `Start Listening`
+2. Speak into the active call stream or play a customer call clip
 3. Click `Stop`
-4. Wait for the transcript and suggestion card
+4. Wait for the customer transcript and suggestion card
 5. Click `Scorecard` after at least one transcript entry exists
-
-## Mode Buttons
-
-- `Direct`
-  - demo coaching mode
-  - sends the request as a direct coaching scenario
-
-- `Agora Bot`
-  - live-call-style mode label
-  - currently affects the request mode only
-  - real Agora call orchestration is still future work
 
 ## macOS Notes
 
@@ -96,5 +84,5 @@ npm run dev -w windows-shell
 ## Notes
 
 - This is a prototype/demo build, not a production sales system.
-- The current voice flow is push-to-talk, not continuous streaming.
-- The app currently transcribes actual microphone input, not hardcoded text.
+- The current voice flow is chunked live capture, not continuous streaming.
+- The Worker filters out non-customer turns before generating coaching.
