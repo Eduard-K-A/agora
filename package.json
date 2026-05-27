@@ -1,0 +1,13 @@
+{
+  "name": "agora-copilot",
+  "private": true,
+  "workspaces": [
+    "worker",
+    "windows-shell"
+  ],
+  "scripts": {
+    "typecheck": "npm run typecheck -w worker && npm run typecheck -w windows-shell",
+    "test": "npm run test -w worker && npm run test -w windows-shell"
+  }
+}
+

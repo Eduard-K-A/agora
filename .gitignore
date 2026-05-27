@@ -1,0 +1,12 @@
+node_modules/
+dist/
+build/
+.wrangler/
+.env
+.dev.vars
+.env.*
+!.env.example
+!windows-shell/.env.example
+coverage/
+*.log
+.DS_Store

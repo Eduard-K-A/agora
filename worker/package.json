@@ -1,0 +1,21 @@
+{
+  "name": "agora-worker",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "agora-token": "^2.0.5",
+    "groq-sdk": "^0.32.0"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20240529.0",
+    "typescript": "^5.8.0",
+    "vitest": "^3.0.0",
+    "wrangler": "^3.0.0"
+  }
+}
